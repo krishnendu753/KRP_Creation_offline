@@ -167,8 +167,9 @@ export default function App() {
           if (syncedCount > 0) {
             console.log(`Successfully synchronized ${syncedCount} products from Cloud Database.`);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Cloud product sync failed: ", err);
+          showToast(`Cloud Sync Error: ${err.message || 'Unknown database error'}`, 'error');
         } finally {
           setIsCatalogSyncing(false);
         }
