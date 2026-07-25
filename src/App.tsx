@@ -6,7 +6,7 @@ import { db, type Product, type Order } from './db/db';
 import { loginUser, registerUser } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
-import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProductsFromCloud, syncOrdersToCloud, syncSettingsToCloud, pullSettingsFromCloud, getSupabaseClient } from './services/supabase';
+import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProductsFromCloud, syncOrdersToCloud, syncSettingsToCloud, pullSettingsFromCloud, getSupabaseClient, pullOrdersFromCloud } from './services/supabase';
 
 type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
 
@@ -128,6 +128,8 @@ export default function App() {
   const [editPrice, setEditPrice] = useState('');
   const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co');
   const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI');
+  const [rejectingOrderId, setRejectingOrderId] = useState<number | null>(null);
+  const [rejectionReasonText, setRejectionReasonText] = useState('');
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -196,6 +198,16 @@ export default function App() {
           console.error("Cloud settings sync failed: ", err);
         });
 
+      pullOrdersFromCloud()
+        .then((count) => {
+          if (count > 0) {
+            console.log(`Successfully synchronized ${count} orders from Cloud Database.`);
+          }
+        })
+        .catch((err) => {
+          console.error("Cloud orders sync failed: ", err);
+        });
+
       // Subscribe to live database updates (Supabase Realtime)
       const supabase = getSupabaseClient();
       if (supabase) {
@@ -250,9 +262,34 @@ export default function App() {
           })
           .subscribe();
 
+        // Orders realtime subscription
+        const ordersChannel = supabase
+          .channel('realtime-orders')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
+            console.log('Realtime order change payload received: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.orders.delete(Number(payload.old.id));
+            } else {
+              const item = payload.new;
+              await db.orders.put({
+                id: Number(item.id),
+                receiptId: item.receipt_id,
+                items: item.items,
+                totalAmount: item.total_amount,
+                shippingInfo: item.shipping_info,
+                summary: item.summary,
+                status: item.status || 'synced',
+                rejectionReason: item.rejection_reason || undefined,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
+          })
+          .subscribe();
+
         return () => {
           supabase.removeChannel(productsChannel);
           supabase.removeChannel(settingsChannel);
+          supabase.removeChannel(ordersChannel);
         };
       }
     }
@@ -658,6 +695,35 @@ export default function App() {
     } finally {
       setIsLoading(false);
       setProductToDeleteId(null);
+    }
+  };
+
+  // Admin Reject Order handler
+  const handleRejectOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingOrderId) return;
+
+    setIsLoading(true);
+    try {
+      await db.orders.update(rejectingOrderId, {
+        status: 'rejected',
+        rejectionReason: rejectionReasonText.trim()
+      });
+
+      if (isCloudConfigured()) {
+        const orderObj = await db.orders.get(rejectingOrderId);
+        if (orderObj) {
+          await syncOrdersToCloud([orderObj]);
+        }
+      }
+
+      showToast('Order status updated to Rejected successfully.', 'success');
+      setRejectingOrderId(null);
+      setRejectionReasonText('');
+    } catch (err) {
+      showToast('Failed to reject order.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1951,20 +2017,30 @@ export default function App() {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                {/* Admin Invoice / Bill trigger option */}
                                 <button
                                   onClick={() => setActiveReceiptOrder(order)}
                                   className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-250 transition-colors"
                                 >
                                   View / Print Bill
                                 </button>
+                                {order.status !== 'rejected' && (
+                                  <button
+                                    onClick={() => setRejectingOrderId(order.id!)}
+                                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-200 transition-colors"
+                                  >
+                                    Reject
+                                  </button>
+                                )}
                                 <span
-                                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.status === 'synced'
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                                    }`}
+                                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                                    order.status === 'synced'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : order.status === 'rejected'
+                                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                                  }`}
                                 >
-                                  {order.status === 'synced' ? 'Synced' : 'Pending Sync'}
+                                  {order.status === 'synced' ? 'Synced' : order.status === 'rejected' ? 'Rejected' : 'Pending Sync'}
                                 </span>
                               </div>
                             </div>
@@ -1975,6 +2051,12 @@ export default function App() {
                                 <div><strong>Name:</strong> {order.shippingInfo.fullName}</div>
                                 <div><strong>Phone:</strong> {order.shippingInfo.phone}</div>
                                 <div><strong>Address:</strong> {order.shippingInfo.address}, {order.shippingInfo.city}, {order.shippingInfo.state}, {order.shippingInfo.country} - {order.shippingInfo.pincode}</div>
+                              </div>
+                            )}
+
+                            {order.status === 'rejected' && order.rejectionReason && (
+                              <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-850">
+                                <strong>Rejection Reason:</strong> {order.rejectionReason}
                               </div>
                             )}
 
@@ -2783,6 +2865,48 @@ export default function App() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Order Rejection Explanation Modal */}
+      {rejectingOrderId && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
+          <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800">
+            <h3 className="text-lg font-bold font-serif mb-2 text-slate-805">Reject Order</h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Please provide an explanation or reason for rejecting this customer order.
+            </p>
+            <form onSubmit={handleRejectOrderSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Reason for Rejection *</label>
+                <textarea
+                  required
+                  placeholder="e.g. Size out of stock, incorrect pincode, etc..."
+                  value={rejectionReasonText}
+                  onChange={(e) => setRejectionReasonText(e.target.value)}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-rose-400 h-20 resize-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRejectingOrderId(null);
+                    setRejectionReasonText('');
+                  }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-705 font-bold py-2 rounded-lg text-xs transition-colors border border-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md"
+                >
+                  Reject Order
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

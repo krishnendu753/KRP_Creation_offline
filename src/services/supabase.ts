@@ -120,6 +120,8 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
     total_amount: order.totalAmount,
     shipping_info: order.shippingInfo,
     summary: order.summary,
+    status: order.status,
+    rejection_reason: order.rejectionReason || null,
     created_at: new Date(order.createdAt).toISOString()
   }));
 
@@ -131,6 +133,38 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
     console.error("Failed to sync orders to cloud: ", error.message);
     throw new Error(error.message);
   }
+};
+
+// Fetch all customer orders from Supabase to sync to local Dexie for Admin viewing
+export const pullOrdersFromCloud = async (): Promise<number> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*');
+
+  if (error) {
+    console.error("Failed to pull orders from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data && data.length > 0) {
+    const ordersToPut = data.map(item => ({
+      id: Number(item.id),
+      receiptId: item.receipt_id,
+      items: item.items,
+      totalAmount: item.total_amount,
+      shippingInfo: item.shipping_info,
+      summary: item.summary,
+      status: item.status || 'synced',
+      rejectionReason: item.rejection_reason || undefined,
+      createdAt: new Date(item.created_at).getTime()
+    }));
+    await db.orders.bulkPut(ordersToPut);
+    return data.length;
+  }
+  return 0;
 };
 
 // Push configurations to Supabase settings table
