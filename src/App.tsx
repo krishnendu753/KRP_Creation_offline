@@ -156,7 +156,13 @@ export default function App() {
   // Pull catalog products and global configurations from cloud on mount or online status change
   useEffect(() => {
     if (isOnline && isCloudConfigured()) {
-      setIsCatalogSyncing(true);
+      // Non-blocking sync check: only show skeleton loaders if we have nothing stored locally
+      db.products.count().then((count) => {
+        if (count === 0) {
+          setIsCatalogSyncing(true);
+        }
+      });
+
       pullProductsFromCloud()
         .then((count) => {
           if (count > 0) {
