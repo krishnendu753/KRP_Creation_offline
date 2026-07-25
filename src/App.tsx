@@ -11,7 +11,11 @@ import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProd
 type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
 
 const ADMIN_PHONES = ['7890784816', '7059782504'];
-const isAdmin = (phone: string | undefined) => !!phone && ADMIN_PHONES.includes(phone);
+const isAdmin = (phone: string | undefined) => {
+  if (!phone) return false;
+  const cleanPhone = phone.replace(/\D/g, '');
+  return ADMIN_PHONES.some(adminPhone => cleanPhone.endsWith(adminPhone));
+};
 
 const FESTIVAL_OPTIONS = [
   'January Sale',
