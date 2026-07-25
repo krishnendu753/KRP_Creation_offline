@@ -1402,7 +1402,7 @@ export default function App() {
                             order.status === 'synced'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                               : order.status === 'rejected'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              ? 'bg-rose-50 text-rose-750 border-rose-200'
                               : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}
                         >
@@ -1410,13 +1410,6 @@ export default function App() {
                         </span>
                       </div>
                     </div>
-
-                    {order.status === 'rejected' && order.rejectionReason && (
-                      <div className="bg-rose-50 border border-rose-100 p-3.5 rounded-xl text-xs text-rose-850 animate-in fade-in duration-200">
-                        <div className="font-bold text-rose-800 mb-0.5">⚠️ Order Rejected by Seller:</div>
-                        <div>Reason: {order.rejectionReason}</div>
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                       {/* Products Summary list */}
@@ -1461,6 +1454,12 @@ export default function App() {
                             <span>Total Paid:</span>
                             <span className="text-rose-600 font-black">₹{order.totalAmount.toFixed(2)}</span>
                           </div>
+                        </div>
+                      )}
+
+                      {order.status === 'rejected' && order.rejectionReason && (
+                        <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-800 font-medium">
+                          <strong>Rejection Reason:</strong> {order.rejectionReason}
                         </div>
                       )}
                     </div>
@@ -2018,15 +2017,15 @@ export default function App() {
                             key={order.id}
                             className="bg-rose-50/30 border border-rose-100 p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm"
                           >
-                            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-rose-100/50 pb-2 gap-2">
-                              <div>
-                                <span className="font-bold text-slate-800 font-mono">Order #{order.receiptId || `KRP-${order.id}`}</span>
-                                <span className="text-slate-400 text-xs md:ml-3 block md:inline mt-1 md:mt-0">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start border-b border-rose-100/50 pb-2 gap-2">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                <span className="font-bold text-slate-800 font-mono text-xs sm:text-sm">Order #{order.receiptId || `KRP-${order.id}`}</span>
+                                <span className="text-slate-400 text-[10px] sm:text-xs">
                                   {moment(order.createdAt).format('D MMMM YYYY hh:mm A')}
                                 </span>
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
                                 <button
                                   onClick={() => setActiveReceiptOrder(order)}
                                   className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-250 transition-colors"
