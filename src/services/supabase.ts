@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { db, type Product, type Order } from '../db/db';
 
-// Retrieve Supabase credentials dynamically from local storage configuration
+const DEFAULT_SUPABASE_URL = 'https://ggbevhaudwhbpevjbdhq.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI';
+
+// Retrieve Supabase credentials dynamically from local storage configuration or fall back to defaults
 export const getSupabaseClient = () => {
-  const url = localStorage.getItem('supabase_url');
-  const key = localStorage.getItem('supabase_key');
+  const url = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+  const key = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
   if (!url || !key) return null;
   try {
     return createClient(url, key);
@@ -14,10 +17,10 @@ export const getSupabaseClient = () => {
   }
 };
 
-// Check if Cloud Database Connector is fully configured
+// Check if Cloud Database Connector is configured with any credential keys
 export const isCloudConfigured = (): boolean => {
-  const url = localStorage.getItem('supabase_url');
-  const key = localStorage.getItem('supabase_key');
+  const url = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+  const key = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
   return !!url && !!key;
 };
 

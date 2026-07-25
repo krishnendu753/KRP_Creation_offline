@@ -126,8 +126,8 @@ export default function App() {
   const [editProductImage, setEditProductImage] = useState('');
   const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
-  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || '');
-  const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || '');
+  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co');
+  const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI');
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -1648,42 +1648,50 @@ export default function App() {
                         Save & Connect
                       </button>
                     </form>
-                    {isCloudConfigured() && isAdmin(user?.phone) ? (
+                    {isAdmin(user?.phone) && (
                       <div className="space-y-3">
-                        <div className="text-[10px] text-emerald-600 font-bold bg-emerald-50 p-2.5 rounded-lg text-center border border-emerald-100">
-                          Connected to Cloud Database
+                        <div className={`text-[10px] font-bold p-2.5 rounded-lg text-center border ${
+                          isCloudConfigured() 
+                            ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
+                            : 'text-amber-600 bg-amber-50 border-amber-100'
+                        }`}>
+                          {isCloudConfigured() ? 'Connected to Cloud Database' : 'Running in Local-Only Mode'}
                         </div>
                         <div className="bg-rose-50/50 border border-rose-100 p-3 rounded-xl text-[10px] space-y-2 text-slate-700 font-medium">
                           <div className="font-bold text-rose-700 uppercase tracking-widest text-[9px] mb-1">Active Credentials:</div>
                           <div className="flex items-center justify-between gap-2 border-b border-rose-100/50 pb-1.5">
-                            <span className="truncate">URL: <strong>{supabaseUrl}</strong></span>
+                            <span className="truncate">URL: <strong>{supabaseUrl || '(Not Set)'}</strong></span>
                             <button
+                              type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText(supabaseUrl);
-                                showToast('Project URL copied to clipboard!', 'success');
+                                if (supabaseUrl) {
+                                  navigator.clipboard.writeText(supabaseUrl);
+                                  showToast('Project URL copied to clipboard!', 'success');
+                                }
                               }}
-                              className="text-[9px] bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
+                              disabled={!supabaseUrl}
+                              className="text-[9px] bg-rose-100 hover:bg-rose-200 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
                             >
                               Copy
                             </button>
                           </div>
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate">Key: <strong>{supabaseKey}</strong></span>
+                            <span className="truncate">Key: <strong>{supabaseKey ? `${supabaseKey.substring(0, 15)}...` : '(Not Set)'}</strong></span>
                             <button
+                              type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText(supabaseKey);
-                                showToast('Anon Key copied to clipboard!', 'success');
+                                if (supabaseKey) {
+                                  navigator.clipboard.writeText(supabaseKey);
+                                  showToast('Anon Key copied to clipboard!', 'success');
+                                }
                               }}
-                              className="text-[9px] bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
+                              disabled={!supabaseKey}
+                              className="text-[9px] bg-rose-100 hover:bg-rose-200 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
                             >
                               Copy
                             </button>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2.5 rounded-lg text-center border border-amber-100">
-                        Running in Local-Only Mode
                       </div>
                     )}
                   </div>
@@ -2538,9 +2546,9 @@ export default function App() {
                 return (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 bg-rose-50/50 p-3 rounded-xl border border-rose-100/60 mb-5 animate-in fade-in duration-150">
-                      {editingProduct.imageUrl ? (
+                      {editProductImage ? (
                         <img
-                          src={editingProduct.imageUrl}
+                          src={editProductImage}
                           alt={editingProduct.name}
                           className="w-12 h-12 object-cover rounded-lg bg-rose-50 border border-rose-100 shrink-0"
                         />
