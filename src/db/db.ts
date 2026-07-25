@@ -81,58 +81,7 @@ class OfflineEcommerceDB extends Dexie {
 
 export const db = new OfflineEcommerceDB();
 
-// Populate initial products
-db.on('populate', () => {
-  db.products.bulkAdd([
-    {
-      id: 'p1',
-      name: 'Elegant Silk Saree',
-      price: 89.99,
-      description: 'Beautiful traditional Indian silk saree with intricate golden zari work, perfect for weddings and festive occasions.',
-      imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&auto=format&fit=crop&q=60',
-      category: 'Saree',
-      stock: 12
-    },
-    {
-      id: 'p2',
-      name: 'Floral Summer Maxi Dress',
-      price: 39.99,
-      description: 'Lightweight, breathable floral print maxi dress featuring a matching belt and flared hemline.',
-      imageUrl: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500&auto=format&fit=crop&q=60',
-      category: 'Dress',
-      stock: 25
-    },
-    {
-      id: 'p3',
-      name: 'Designer Anarkali Kurti',
-      price: 49.99,
-      description: 'Long flared ethnic designer kurti with premium embroidery work on the neck and sleeves.',
-      imageUrl: 'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=500&auto=format&fit=crop&q=60',
-      category: 'Kurti',
-      stock: 18
-    },
-    {
-      id: 'p4',
-      name: 'Premium Cotton Salwar Suit',
-      price: 54.99,
-      description: 'Complete 3-piece pure cotton salwar kameez set with a soft printed dupatta.',
-      imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=500&auto=format&fit=crop&q=60',
-      category: 'Salwar Suit',
-      stock: 15
-    },
-    {
-      id: 'p5',
-      name: 'Classic Women Denim Jacket',
-      price: 45.99,
-      description: 'Stylish washed blue denim jacket with button closures and practical front pockets.',
-      imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=500&auto=format&fit=crop&q=60',
-      category: 'Jackets',
-      stock: 10
-    }
-  ]);
-});
-
-// Clean up legacy products and populate default garments on startup
+// Clean up legacy products and delete default items on startup
 db.open().then(async () => {
   const allowedCategories = ['Saree', 'Dress', 'Kurti', 'Salwar Suit', 'Jackets'];
   const allProds = await db.products.toArray();
@@ -147,73 +96,10 @@ db.open().then(async () => {
     console.log(`Cleaned up ${invalidProdIds.length} legacy products.`);
   }
 
-  // Populate default garments if database is empty
-  const updatedProds = await db.products.toArray();
-  if (updatedProds.length === 0) {
-    await db.products.bulkAdd([
-      {
-        id: 'p1',
-        name: 'Elegant Silk Saree',
-        price: 89.99,
-        description: 'Beautiful traditional Indian silk saree with intricate golden zari work, perfect for weddings and festive occasions.',
-        imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=500&auto=format&fit=crop&q=60',
-        category: 'Saree',
-        stock: 12,
-        deliveryCharge: 60,
-        safetyFee: 15,
-        isActive: true
-      },
-      {
-        id: 'p2',
-        name: 'Floral Summer Maxi Dress',
-        price: 39.99,
-        description: 'Lightweight, breathable floral print maxi dress featuring a matching belt and flared hemline.',
-        imageUrl: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500&auto=format&fit=crop&q=60',
-        category: 'Dress',
-        stock: 25,
-        deliveryCharge: 40,
-        safetyFee: 10,
-        isActive: true
-      },
-      {
-        id: 'p3',
-        name: 'Designer Anarkali Kurti',
-        price: 49.99,
-        description: 'Long flared ethnic designer kurti with premium embroidery work on the neck and sleeves.',
-        imageUrl: 'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=500&auto=format&fit=crop&q=60',
-        category: 'Kurti',
-        stock: 18,
-        deliveryCharge: 45,
-        safetyFee: 10,
-        isActive: true
-      },
-      {
-        id: 'p4',
-        name: 'Premium Cotton Salwar Suit',
-        price: 54.99,
-        description: 'Complete 3-piece pure cotton salwar kameez set with a soft printed dupatta.',
-        imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=500&auto=format&fit=crop&q=60',
-        category: 'Salwar Suit',
-        stock: 15,
-        deliveryCharge: 50,
-        safetyFee: 12,
-        isActive: true
-      },
-      {
-        id: 'p5',
-        name: 'Classic Women Denim Jacket',
-        price: 45.99,
-        description: 'Stylish washed blue denim jacket with button closures and practical front pockets.',
-        imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=500&auto=format&fit=crop&q=60',
-        category: 'Jackets',
-        stock: 10,
-        deliveryCharge: 50,
-        safetyFee: 10,
-        isActive: true
-      }
-    ]);
-    console.log("Populated ladies garments default products.");
-  }
+  // Delete default seed products if they exist
+  const defaultIds = ['p1', 'p2', 'p3', 'p4', 'p5'];
+  await db.products.bulkDelete(defaultIds);
+  console.log("Cleared default seed products.");
 
   // Pre-register Admin accounts if they do not exist
   const admins = ['7890784816', '7059782504'];

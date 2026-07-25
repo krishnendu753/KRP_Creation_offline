@@ -6,8 +6,9 @@ import { db, type Product, type Order } from './db/db';
 import { loginUser, registerUser } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
+import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProductsFromCloud, syncOrdersToCloud } from './services/supabase';
 
-type Page = 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
+type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
 
 const ADMIN_PHONES = ['7890784816', '7059782504'];
 const isAdmin = (phone: string | undefined) => !!phone && ADMIN_PHONES.includes(phone);
@@ -70,7 +71,7 @@ export default function App() {
   const { user, login: setAuthSession, logout } = useAuth();
   const { cartItems, addToCart, updateQuantity, clearCart } = useCart();
   const isOnline = useNetworkStatus();
-  const [currentPage, setCurrentPage] = useState<Page>('login');
+  const [currentPage, setCurrentPage] = useState<Page>('home');
 
   // Input states
   const [phone, setPhone] = useState('');
@@ -119,6 +120,9 @@ export default function App() {
   const [editSafetyFee, setEditSafetyFee] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
   const [editProductImage, setEditProductImage] = useState('');
+  const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
+  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || '');
+  const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || '');
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -134,14 +138,29 @@ export default function App() {
   const pendingOrders = useLiveQuery(() => db.orders.where('status').equals('pending_sync').toArray()) || [];
   const allOrders = useLiveQuery(() => db.orders.toArray()) || [];
 
-  // Automatically redirect based on user authentication state
+  // Automatically redirect based on user authentication state (Allowing 'home' tab view first)
   useEffect(() => {
     if (user) {
       setCurrentPage('catalog');
     } else {
-      setCurrentPage('login');
+      setCurrentPage('home');
     }
   }, [user]);
+
+  // Pull catalog products from cloud on mount or online status change
+  useEffect(() => {
+    if (isOnline && isCloudConfigured()) {
+      pullProductsFromCloud()
+        .then((count) => {
+          if (count > 0) {
+            console.log(`Successfully synchronized ${count} products from Cloud Database.`);
+          }
+        })
+        .catch((err) => {
+          console.error("Cloud synchronization failed: ", err);
+        });
+    }
+  }, [isOnline]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -307,6 +326,13 @@ export default function App() {
 
       if (createdOrder) {
         setActiveReceiptOrder(createdOrder);
+        if (isOnline && isCloudConfigured()) {
+          try {
+            await syncOrdersToCloud([createdOrder]);
+          } catch (e) {
+            console.error("Direct order cloud sync failed: ", e);
+          }
+        }
       }
 
       if (isOnline) {
@@ -337,6 +363,10 @@ export default function App() {
       }
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      if (isCloudConfigured()) {
+        await syncOrdersToCloud(unsynced);
+      }
 
       for (const order of unsynced) {
         await db.orders.update(order.id!, { status: 'synced' });
@@ -394,7 +424,7 @@ export default function App() {
     setIsLoading(true);
     try {
       const newId = 'prod_' + Math.random().toString(36).substr(2, 9);
-      await db.products.add({
+      const newProductObj: Product = {
         id: newId,
         name: newProductName.trim(),
         price: parseFloat(newProductPrice),
@@ -409,7 +439,11 @@ export default function App() {
         safetyFee: parseFloat(newProductSafety) || 0,
         isActive: true,
         reviews: []
-      });
+      };
+      await db.products.add(newProductObj);
+      if (isCloudConfigured()) {
+        await syncProductToCloud(newProductObj);
+      }
       showToast('Product added successfully to catalog!', 'success');
       setNewProductName('');
       setNewProductPrice('');
@@ -449,6 +483,13 @@ export default function App() {
         imageUrl: editProductImage || ''
       });
 
+      if (isCloudConfigured()) {
+        const updatedObj = await db.products.get(editingProductId);
+        if (updatedObj) {
+          await syncProductToCloud(updatedObj);
+        }
+      }
+
       showToast('Product details updated successfully!', 'success');
       setEditingProductId(null);
     } catch (err) {
@@ -463,11 +504,37 @@ export default function App() {
     setIsLoading(true);
     try {
       await db.products.update(productId, { isActive: !currentStatus });
+      if (isCloudConfigured()) {
+        const updated = await db.products.get(productId);
+        if (updated) {
+          await syncProductToCloud(updated);
+        }
+      }
       showToast(`Product visibility updated to ${!currentStatus ? 'Active' : 'Inactive'}.`, 'success');
     } catch (err) {
       showToast('Failed to update product visibility status.', 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Admin Delete Product
+  const handleDeleteProduct = async (productId: string) => {
+    setIsLoading(true);
+    try {
+      await db.products.delete(productId);
+      if (isCloudConfigured()) {
+        await deleteProductFromCloud(productId);
+      }
+      showToast('Product deleted from catalog successfully.', 'success');
+      if (editingProductId === productId) {
+        setEditingProductId(null);
+      }
+    } catch (err) {
+      showToast('Failed to delete product.', 'error');
+    } finally {
+      setIsLoading(false);
+      setProductToDeleteId(null);
     }
   };
 
@@ -568,13 +635,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-rose-50/50 text-slate-800 font-sans flex flex-col relative print:bg-white print:text-black">
-      
+
       {/* Toast Alert Notification */}
       {toast && (
         <div className="fixed top-5 right-5 z-55 max-w-sm w-full bg-white border border-rose-100 rounded-xl shadow-2xl p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden">
-          <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${
-            toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
-          }`} />
+          <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
+            }`} />
           <div className="text-sm font-medium text-slate-700">{toast.message}</div>
           <button onClick={() => setToast(null)} className="ml-auto text-slate-400 hover:text-slate-600 font-bold">✕</button>
         </div>
@@ -592,10 +658,10 @@ export default function App() {
 
       {/* Top Banner & Header */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-rose-100 px-4 py-3 flex items-center justify-between shadow-sm print:hidden">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentPage('catalog')}>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentPage('home')}>
           <img src="/logo.jpg" alt="KRP Creation Logo" className="w-16 h-16 object-contain rounded-full border border-rose-100 shadow-sm shrink-0" />
           <div className="flex flex-col">
-            <span className="text-2xl font-extrabold bg-gradient-to-r from-rose-500 to-pink-655 bg-clip-text text-transparent leading-none">
+            <span className="text-2xl font-extrabold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent leading-none">
               KRP Creation
             </span>
             <span className="text-xs tracking-wider text-rose-500 font-semibold mt-0.5">Ladies Garments</span>
@@ -609,88 +675,181 @@ export default function App() {
               {isOnline ? 'Online' : 'Offline'}
             </span>
           </div>
-
-          {user ? (
-            <div className="hidden sm:flex items-center gap-2.5 text-sm text-slate-600">
-              <div className="flex items-center gap-1.5">
-                <span>Hi, {user.name}</span>
-                <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full font-bold shadow-sm ${
-                  isAdmin(user.phone)
-                    ? 'bg-rose-100 text-rose-700 border border-rose-200' 
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                }`}>
-                  {isAdmin(user.phone) ? 'Admin' : 'Customer'}
-                </span>
-              </div>
-              <button
-                onClick={logout}
-                className="text-xs bg-rose-100 hover:bg-rose-200 text-rose-700 px-2.5 py-1 rounded-lg transition-colors font-medium"
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setCurrentPage('login')}
-              className="text-sm text-rose-600 hover:text-rose-700 font-semibold"
-            >
-              Sign In
-            </button>
-          )}
         </div>
       </header>
 
       {/* Navigation Tabs */}
-      <nav className="bg-white border-b border-rose-100 flex justify-center sm:justify-start gap-4 px-4 py-2 text-sm shadow-sm print:hidden">
-        <button
-          onClick={() => setCurrentPage('catalog')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all ${
-            currentPage === 'catalog' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-50'
-          }`}
-        >
-          Catalog
-        </button>
-        <button
-          onClick={() => setCurrentPage('cart')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-            currentPage === 'cart' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-50'
-          }`}
-        >
-          Cart
-          {cartItems.length > 0 && (
-            <span className="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-bold">
-              {cartItems.reduce((acc, i) => acc + i.quantity, 0)}
-            </span>
-          )}
-        </button>
-        
-        {/* Customer Past Orders tab */}
-        {user && (
+      <nav className="bg-white border-b border-rose-100 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm shadow-sm print:hidden">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setCurrentPage('my-orders')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              currentPage === 'my-orders' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-50'
-            }`}
+            onClick={() => setCurrentPage('home')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'home' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
+              }`}
           >
-            My Orders
+            Home
           </button>
-        )}
-        
-        {/* Admin panel tab is strictly visible only to logged-in admin */}
-        {isAdmin(user?.phone) && (
           <button
-            onClick={() => setCurrentPage('admin')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-50'
-            }`}
+            onClick={() => setCurrentPage('catalog')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'catalog' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
+              }`}
           >
-            Admin Panel
+            Catalog
+          </button>
+          <button
+            onClick={() => setCurrentPage('cart')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${currentPage === 'cart' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
+              }`}
+          >
+            Cart
+            {cartItems.length > 0 && (
+              <span className="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                {cartItems.reduce((acc, i) => acc + i.quantity, 0)}
+              </span>
+            )}
+          </button>
+          
+          {/* Customer Past Orders tab */}
+          {user && (
+            <button
+              onClick={() => setCurrentPage('my-orders')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'my-orders' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-550 hover:text-slate-700 hover:bg-rose-55'
+                }`}
+            >
+              My Orders
+            </button>
+          )}
+          
+          {/* Admin panel tab is strictly visible only to logged-in admin */}
+          {isAdmin(user?.phone) && (
+            <button
+              onClick={() => setCurrentPage('admin')}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
+                }`}
+            >
+              Admin Panel
+            </button>
+          )}
+        </div>
+
+        {/* User Session Info & Logout Button */}
+        {user ? (
+          <div className="flex items-center gap-2 text-xs text-slate-600 bg-rose-50/40 px-3 py-1 rounded-xl border border-rose-100/50 max-w-full overflow-hidden shrink-0">
+            <span className="font-semibold text-slate-700 truncate max-w-[100px] sm:max-w-[150px]">Hi, {user.name}</span>
+            <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-bold ${isAdmin(user.phone)
+                ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+              }`}>
+              {isAdmin(user.phone) ? 'Admin' : 'User'}
+            </span>
+            <button
+              onClick={logout}
+              className="bg-rose-600 hover:bg-rose-550 text-white text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors shadow-sm cursor-pointer shrink-0"
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setCurrentPage('login')}
+            className="text-xs text-rose-650 hover:text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg border border-rose-100 transition-all shrink-0"
+          >
+            Sign In
           </button>
         )}
       </nav>
 
       {/* Main Content Areas */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 print:hidden">
+        
+        {/* Home Landing Page */}
+        {currentPage === 'home' && (
+          <div className="space-y-12 animate-in fade-in duration-300">
+            {/* Hero Section */}
+            <div className="relative bg-white rounded-3xl overflow-hidden border border-rose-100 shadow-sm p-6 sm:p-12 flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1 space-y-6 text-center md:text-left">
+                <span className="text-xs uppercase tracking-widest bg-rose-100 text-rose-700 px-3.5 py-1 rounded-full border border-rose-200 font-bold">
+                  Est. 2026 Boutique
+                </span>
+                <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 font-serif leading-tight">
+                  Discover Handcrafted <br />
+                  <span className="bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent">
+                    Ladies Garments
+                  </span>
+                </h1>
+                <p className="text-slate-500 text-sm sm:text-base leading-relaxed max-w-xl">
+                  Welcome to <strong className="font-semibold text-rose-600">KRP Creation</strong>, where elegance meets premium quality. We offer an exquisite range of Sarees, Dresses, Kurtis, Salwar Suits, and Jackets meticulously crafted for all occasions. Whether you are dressing up for a grand Indian festival or looking for elegant daily comforts, our collections guarantee rich textures, durable stitching, and premium fabrics.
+                </p>
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
+                  <button
+                    onClick={() => setCurrentPage('catalog')}
+                    className="bg-rose-600 hover:bg-rose-550 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                  >
+                    Explore Catalog
+                  </button>
+                  {!user ? (
+                    <button
+                      onClick={() => setCurrentPage('login')}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-sm px-6 py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                    >
+                      Sign In
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setCurrentPage('my-orders')}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-sm px-6 py-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                    >
+                      View My Orders
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="w-64 h-64 sm:w-80 sm:h-80 shrink-0 relative overflow-hidden rounded-full border border-rose-200 shadow-md">
+                <img
+                  src="/model_kurti.png"
+                  alt="Model wearing premium KRP Kurti"
+                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
+                />
+              </div>
+            </div>
+
+            {/* Quality & Features Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white border border-rose-100 p-6 rounded-2xl shadow-sm text-center space-y-3">
+                <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">✨</div>
+                <h3 className="font-bold text-base text-slate-800 font-serif">Premium Quality Fabrics</h3>
+                <p className="text-xs text-slate-505 leading-relaxed">
+                  Every product is sourced using the finest silk, cotton, and georgette threads. Designed to feel lightweight on daily wear yet rich and heavy for ceremonies.
+                </p>
+              </div>
+
+              <div className="bg-white border border-rose-100 p-6 rounded-2xl shadow-sm text-center space-y-3">
+                <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎉</div>
+                <h3 className="font-bold text-base text-slate-800 font-serif">Festive & Daily Versatility</h3>
+                <p className="text-xs text-slate-505 leading-relaxed">
+                  From intricate golden zari borders on sarees for Durga Puja/Diwali to comfortable, breathable cotton kurtis for work or home chores.
+                </p>
+              </div>
+
+              <div className="bg-white border border-rose-100 p-6 rounded-2xl shadow-sm text-center space-y-3">
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
+                <h3 className="font-bold text-base text-slate-800 font-serif">Secure Local Shopping</h3>
+                <p className="text-xs text-slate-505 leading-relaxed">
+                  Our offline first setup stores all your credentials and shopping logs in secure sandbox memory, allowing complete access even in areas with zero network.
+                </p>
+              </div>
+            </div>
+
+            {/* Fabric Spotlight block */}
+            <div className="bg-rose-50/40 border border-rose-100 p-6 sm:p-8 rounded-3xl text-center max-w-3xl mx-auto space-y-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800 font-serif">Crafted for Every Celebration</h2>
+              <p className="text-xs sm:text-sm text-slate-550 leading-relaxed">
+                "KRP Creation was built on the values of traditional Indian garment craftsmanship. Our sarees feature heavy handloom designs, our salwar suits are tailored for ease of movement, and our modern kurtis blend traditional aesthetics with contemporary silhouettes. Choose KRP Creation to add elegance to your wardrobe."
+              </p>
+              <div className="text-xs font-bold text-rose-700">— Ranu Das Pal, Founder</div>
+            </div>
+          </div>
+        )}
+
         {/* Catalog Page */}
         {currentPage === 'catalog' && (
           <div>
@@ -732,7 +891,7 @@ export default function App() {
 
             {activeProducts.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-rose-100 shadow-sm">
-                <p className="text-slate-500">Currently no products are visible in our catalog.</p>
+                <p className="text-slate-550">Currently no products are visible in our catalog.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -743,7 +902,7 @@ export default function App() {
 
                   // Calculate average rating
                   const productReviews = product.reviews || [];
-                  const avgRating = productReviews.length > 0 
+                  const avgRating = productReviews.length > 0
                     ? parseFloat((productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length).toFixed(1))
                     : null;
 
@@ -801,7 +960,7 @@ export default function App() {
                               </span>
                             )}
                           </div>
-                          
+
                           {/* Stars display */}
                           <div className="flex items-center gap-1 mt-2">
                             {avgRating ? (
@@ -833,11 +992,10 @@ export default function App() {
                               handleAddToCart(product);
                             }}
                             disabled={isSoldOut}
-                            className={`text-xs font-bold py-2 px-4 rounded-lg transition-colors shadow-sm ${
-                              isSoldOut
+                            className={`text-xs font-bold py-2 px-4 rounded-lg transition-colors shadow-sm ${isSoldOut
                                 ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
                                 : 'bg-rose-600 hover:bg-rose-500 text-white'
-                            }`}
+                              }`}
                           >
                             Add to Cart
                           </button>
@@ -919,15 +1077,15 @@ export default function App() {
 
                 {/* Cart pricing summary including new taxes/charges */}
                 <div className="bg-white border border-rose-100 rounded-2xl p-5 h-fit space-y-4 shadow-sm text-sm">
-                  <h3 className="font-bold text-base border-b border-rose-50 pb-3 text-slate-805">Price Breakdowns</h3>
-                  
-                  <div className="flex justify-between text-slate-600">
+                  <h3 className="font-bold text-base border-b border-rose-50 pb-3 text-slate-850">Price Breakdowns</h3>
+
+                  <div className="flex justify-between text-slate-655">
                     <span>Subtotal (Base)</span>
                     <span>₹{rawSubtotal.toFixed(2)}</span>
                   </div>
-                  
+
                   {discountSaved > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-medium">
+                    <div className="flex justify-between text-emerald-605 font-medium">
                       <span>Total Savings</span>
                       <span>-₹{discountSaved.toFixed(2)}</span>
                     </div>
@@ -986,7 +1144,7 @@ export default function App() {
         {currentPage === 'my-orders' && (
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 mb-6 font-serif">My Order History</h1>
-            
+
             {customerOrders.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-rose-100 shadow-sm">
                 <p className="text-slate-500">You haven't placed any purchases yet using this phone number.</p>
@@ -1011,7 +1169,7 @@ export default function App() {
                           {moment(order.createdAt).format('D MMMM YYYY hh:mm A')}
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => setActiveReceiptOrder(order)}
@@ -1020,11 +1178,10 @@ export default function App() {
                           View / Print Receipt Bill
                         </button>
                         <span
-                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${
-                            order.status === 'synced'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}
+                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'synced'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}
                         >
                           {order.status === 'synced' ? 'Placed Online' : 'Queued Offline'}
                         </span>
@@ -1095,7 +1252,7 @@ export default function App() {
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-505 uppercase tracking-wider mb-1">Phone Number (Numbers Only)</label>
+                <label className="block text-xs font-semibold text-slate-505 uppercase tracking-wider mb-1">Phone Number</label>
                 <input
                   type="tel"
                   required
@@ -1108,7 +1265,7 @@ export default function App() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-505 uppercase tracking-wider mb-1">PIN (Numbers Only)</label>
+                <label className="block text-xs font-semibold text-slate-505 uppercase tracking-wider mb-1">PIN</label>
                 <input
                   type="password"
                   required
@@ -1131,7 +1288,7 @@ export default function App() {
             <div className="text-center mt-6 text-sm text-slate-500">
               Don't have a local account?{' '}
               <button onClick={() => setCurrentPage('register')} className="text-rose-600 hover:text-rose-700 font-semibold">
-                Register Offline
+                Register
               </button>
             </div>
           </div>
@@ -1159,7 +1316,7 @@ export default function App() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-550 uppercase tracking-wider mb-1">Phone Number (Numbers Only)</label>
+                <label className="block text-xs font-semibold text-slate-550 uppercase tracking-wider mb-1">Phone Number </label>
                 <input
                   type="tel"
                   required
@@ -1210,7 +1367,7 @@ export default function App() {
                 <p className="text-slate-505 text-sm mt-1">Requires stable internet connection to write modifications.</p>
               </div>
               <div className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-100 bg-white">
-                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-550'}`} />
+                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-555'}`} />
                 <span className={isOnline ? 'text-emerald-600' : 'text-rose-600'}>
                   {isOnline ? 'Authorized (Online)' : 'Blocked (Offline)'}
                 </span>
@@ -1220,7 +1377,7 @@ export default function App() {
             {!isOnline ? (
               <div className="max-w-md mx-auto text-center py-12 bg-rose-50 border border-rose-100 rounded-2xl p-6 shadow-sm">
                 <h3 className="text-xl font-bold text-rose-700 mb-2">Access Restrained</h3>
-                <p className="text-sm text-slate-505 leading-relaxed">
+                <p className="text-sm text-slate-550 leading-relaxed">
                   The Admin Dashboard works strictly with live networks to update the pricing databases, configure catalogs, and view synced global transactions.
                 </p>
                 <div className="mt-4 text-xs text-rose-700 bg-rose-100/50 p-2.5 rounded-lg border border-rose-200">
@@ -1229,15 +1386,15 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Add Product and Manage Product controls */}
                 <div className="lg:col-span-1 space-y-6">
-                  
+
                   {/* Fee & Tax configuration panel (With GST toggle permission) */}
                   <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
                     <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-850">Taxes & Packaging Configuration</h3>
                     <form onSubmit={handleSaveSettings} className="space-y-3 text-xs">
-                      
+
                       {/* GST Toggle Switch */}
                       <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60 mb-2">
                         <input
@@ -1276,7 +1433,7 @@ export default function App() {
                           </div>
                         </div>
                       )}
-                      
+
                       <div>
                         <label className="block text-slate-500 mb-1">Packaging Fee (₹)</label>
                         <input
@@ -1300,7 +1457,7 @@ export default function App() {
                           Show Seller Contact Details
                         </label>
                       </div>
-                      
+
                       <button
                         type="submit"
                         className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-[11px]"
@@ -1308,6 +1465,66 @@ export default function App() {
                         Save Configurations
                       </button>
                     </form>
+                  </div>
+
+                  {/* Cloud Sync Connector configuration */}
+                  <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                    <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-850">Cloud Sync Connector (Supabase)</h3>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      localStorage.setItem('supabase_url', supabaseUrl.trim());
+                      localStorage.setItem('supabase_key', supabaseKey.trim());
+                      showToast('Supabase Cloud credentials updated!', 'success');
+                      if (supabaseUrl.trim() && supabaseKey.trim()) {
+                        setIsLoading(true);
+                        try {
+                          const count = await pullProductsFromCloud();
+                          showToast(`Initial sync completed: loaded ${count} products!`, 'success');
+                        } catch (err) {
+                          showToast('Initial sync failed: please verify URL and Key.', 'error');
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }
+                    }} className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-slate-500 mb-1">Supabase Project URL</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="https://xxxx.supabase.co"
+                          value={supabaseUrl}
+                          onChange={(e) => setSupabaseUrl(e.target.value)}
+                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-500 mb-1">Supabase Anon Key</label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="eyJhbGciOi..."
+                          value={supabaseKey}
+                          onChange={(e) => setSupabaseKey(e.target.value)}
+                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
+                      >
+                        Save & Connect
+                      </button>
+                    </form>
+                    {isCloudConfigured() ? (
+                      <div className="text-[10px] text-emerald-600 font-bold bg-emerald-50 p-2.5 rounded-lg text-center border border-emerald-100">
+                        Connected to Cloud Database
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2.5 rounded-lg text-center border border-amber-100">
+                        Running in Local-Only Mode
+                      </div>
+                    )}
                   </div>
 
                   {/* Add Product form */}
@@ -1384,7 +1601,7 @@ export default function App() {
                             <option value="Jackets">Jackets</option>
                           </select>
                         </div>
-                        
+
                         {/* Festival selector */}
                         <div>
                           <label className="block text-slate-600 mb-1">Festive Offer</label>
@@ -1400,7 +1617,7 @@ export default function App() {
                           </select>
                         </div>
                       </div>
-                      
+
                       {/* Image Source - URL or File upload options */}
                       <div className="space-y-3 pt-1 border-t border-rose-50">
                         <div>
@@ -1424,7 +1641,7 @@ export default function App() {
                           />
                         </div>
                       </div>
-                      
+
                       <button
                         type="submit"
                         className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
@@ -1438,7 +1655,7 @@ export default function App() {
 
                 {/* Orders dashboard + Manage stock list */}
                 <div className="lg:col-span-2 space-y-6">
-                  
+
                   {/* Products stock, pricing fees, and visibility management list */}
                   <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm">
                     <h3 className="font-bold text-lg text-slate-800 border-b border-rose-50 pb-2 mb-4">Stock, Fees & Visibility Editor</h3>
@@ -1449,16 +1666,15 @@ export default function App() {
                             {prod.imageUrl ? (
                               <img src={prod.imageUrl} alt={prod.name} className="w-12 h-12 object-cover rounded bg-rose-50 shrink-0" />
                             ) : (
-                              <div className="w-12 h-12 flex items-center justify-center bg-rose-100 text-rose-500 rounded shrink-0 font-bold text-[8px]">
+                              <div className="w-12 h-12 flex items-center justify-center bg-rose-100 text-rose-505 rounded shrink-0 font-bold text-[8px]">
                                 No Image
                               </div>
                             )}
                             <div>
                               <div className="font-bold text-slate-805 flex items-center gap-1.5">
                                 <span>{prod.name}</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                                  prod.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                }`}>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${prod.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                  }`}>
                                   {prod.isActive !== false ? 'Active' : 'Inactive'}
                                 </span>
                               </div>
@@ -1473,16 +1689,15 @@ export default function App() {
                               ) : null}
                             </div>
                           </div>
-                          
+
                           <div className="flex gap-1.5 shrink-0">
                             {/* Fast Active / Inactive toggle */}
                             <button
                               onClick={() => handleToggleProductActive(prod.id, prod.isActive !== false)}
-                              className={`px-2 py-1 rounded font-semibold border ${
-                                prod.isActive !== false
-                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-                                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                              }`}
+                              className={`px-2 py-1 rounded font-semibold border ${prod.isActive !== false
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                }`}
                             >
                               {prod.isActive !== false ? 'Hide' : 'Show'}
                             </button>
@@ -1500,6 +1715,12 @@ export default function App() {
                               className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded font-semibold"
                             >
                               Edit details
+                            </button>
+                            <button
+                              onClick={() => setProductToDeleteId(prod.id)}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold transition-colors"
+                            >
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -1536,7 +1757,7 @@ export default function App() {
                                   {moment(order.createdAt).format('D MMMM YYYY hh:mm A')}
                                 </span>
                               </div>
-                              
+
                               <div className="flex items-center gap-2 shrink-0">
                                 {/* Admin Invoice / Bill trigger option */}
                                 <button
@@ -1546,17 +1767,16 @@ export default function App() {
                                   View / Print Bill
                                 </button>
                                 <span
-                                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                                    order.status === 'synced'
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                                  }`}
+                                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.status === 'synced'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                    }`}
                                 >
                                   {order.status === 'synced' ? 'Synced' : 'Pending Sync'}
                                 </span>
                               </div>
                             </div>
-                            
+
                             {order.shippingInfo && (
                               <div className="bg-white p-3 rounded-xl border border-rose-100/80 space-y-1 text-slate-600 text-xs shadow-inner">
                                 <div className="font-bold text-slate-700 mb-1">Customer & Delivery Info:</div>
@@ -1568,7 +1788,7 @@ export default function App() {
 
                             {order.summary && (
                               <div className="bg-rose-50/20 p-3 rounded-xl border border-rose-100/40 text-xs space-y-1 text-slate-550">
-                                <div className="font-bold text-slate-600 mb-1">Cost Breakdown:</div>
+                                <div className="font-bold text-slate-605 mb-1">Cost Breakdown:</div>
                                 <div className="flex justify-between">
                                   <span>Subtotal:</span>
                                   <span>₹{order.summary.subtotal.toFixed(2)}</span>
@@ -1616,8 +1836,8 @@ export default function App() {
               ✕
             </button>
             <h3 className="text-xl font-bold text-slate-800 mb-2 border-b border-rose-55 pb-2 font-serif">Delivery Information</h3>
-            <p className="text-xs text-slate-500 mb-4">All delivery address fields are mandatory.</p>
-            
+            <p className="text-xs text-slate-505 mb-4">All delivery address fields are mandatory.</p>
+
             <form onSubmit={handleShippingSubmit} className="space-y-3.5 text-sm">
               <div>
                 <label className="block text-xs font-semibold text-slate-655 mb-1">Receiver's Name *</label>
@@ -1699,11 +1919,11 @@ export default function App() {
                   placeholder="Flat No, Building, Street Name..."
                   value={shipAddress}
                   onChange={(e) => setShipAddress(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-450 focus:outline-none h-16 resize-none text-slate-850"
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-455 focus:outline-none h-16 resize-none text-slate-850"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">Pincode / ZIP * (Numbers Only)</label>
+                <label className="block text-xs font-semibold text-slate-655 mb-1">Pincode / ZIP * </label>
                 <input
                   type="text"
                   required
@@ -1738,19 +1958,19 @@ export default function App() {
               ✕
             </button>
             <h3 className="text-xl font-bold text-slate-800 mb-2 font-serif border-b border-rose-50 pb-2">Scan & Pay</h3>
-            <p className="text-xs text-slate-500 mb-5">Scan this QR code using any UPI application to complete payment.</p>
-            
+            <p className="text-xs text-slate-505 mb-5">Scan this QR code using any UPI application to complete payment.</p>
+
             <div className="my-5">
               <svg className="w-48 h-48 mx-auto border-2 border-rose-100 p-2.5 rounded-2xl bg-white shadow-sm" viewBox="0 0 100 100">
                 <rect width="100" height="100" fill="#fff" />
                 <rect x="5" y="5" width="20" height="20" fill="#e11d48" />
                 <rect x="8" y="8" width="14" height="14" fill="#fff" />
                 <rect x="11" y="11" width="8" height="8" fill="#e11d48" />
-                
+
                 <rect x="75" y="5" width="20" height="20" fill="#e11d48" />
                 <rect x="78" y="8" width="14" height="14" fill="#fff" />
                 <rect x="81" y="11" width="8" height="8" fill="#e11d48" />
-                
+
                 <rect x="5" y="75" width="20" height="20" fill="#e11d48" />
                 <rect x="8" y="78" width="14" height="14" fill="#fff" />
                 <rect x="11" y="81" width="8" height="8" fill="#e11d48" />
@@ -1933,12 +2153,12 @@ export default function App() {
               </button>
               <button
                 onClick={handlePrintInvoice}
-                className="bg-rose-600 hover:bg-rose-500 text-white px-5 py-2 rounded-lg font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md"
+                className="bg-rose-600 hover:bg-rose-550 text-white px-5 py-2 rounded-lg font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md"
               >
                 Print / Save PDF
               </button>
             </div>
-            
+
             {/* Printed invoice note */}
             <div className="hidden print:block text-center text-[10px] text-slate-400 mt-10 border-t border-slate-200 pt-3">
               Thank you for shopping at KRP Creation! Save this copy for warranty and returns.
@@ -1952,7 +2172,7 @@ export default function App() {
       {selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
           <div className="bg-white border border-rose-100 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800 flex flex-col max-h-[90vh]">
-            
+
             <button
               onClick={() => {
                 setSelectedProduct(null);
@@ -1974,7 +2194,7 @@ export default function App() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-rose-100 border border-dashed border-rose-250 text-rose-500 font-bold text-sm gap-1">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-rose-100 border border-dashed border-rose-250 text-rose-505 font-bold text-sm gap-1">
                       <span>👗 No Image Available</span>
                     </div>
                   )}
@@ -1984,14 +2204,13 @@ export default function App() {
                     <span className="bg-rose-100 text-rose-700 border border-rose-200 text-xs px-2.5 py-1 rounded-full font-semibold shadow-sm">
                       {selectedProduct.category}
                     </span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                      selectedProduct.stock <= 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                    }`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${selectedProduct.stock <= 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                      }`}>
                       {selectedProduct.stock <= 0 ? 'Out of Stock' : `Stock: ${selectedProduct.stock} items left`}
                     </span>
                   </div>
                   <h2 className="text-2xl font-bold text-slate-800 font-serif leading-tight">{selectedProduct.name}</h2>
-                  
+
                   {/* Base / Discount prices */}
                   <div>
                     {selectedProduct.discount && selectedProduct.discount > 0 ? (
@@ -2005,7 +2224,7 @@ export default function App() {
                   </div>
 
                   {/* Extra charges */}
-                  <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] text-slate-500 space-y-0.5">
+                  <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] text-slate-505 space-y-0.5">
                     <div className="flex justify-between">
                       <span>Delivery Charge:</span>
                       <span className="font-bold text-slate-700">₹{selectedProduct.deliveryCharge || 0}</span>
@@ -2045,7 +2264,7 @@ export default function App() {
               {/* Customer Reviews Section */}
               <div className="border-t border-rose-100 pt-4 space-y-4">
                 <h3 className="font-bold text-base text-slate-800 font-serif">Customer Reviews</h3>
-                
+
                 {/* Reviews List */}
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                   {!selectedProduct.reviews || selectedProduct.reviews.length === 0 ? (
@@ -2089,7 +2308,7 @@ export default function App() {
                         placeholder="Share your thoughts about this ladies garment..."
                         value={reviewComment}
                         onChange={(e) => setReviewComment(e.target.value)}
-                        className="w-full bg-white border border-rose-100 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-rose-400 h-16 resize-none"
+                        className="w-full bg-white border border-rose-100 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-rose-455 h-16 resize-none"
                       />
                     </div>
                     <button
@@ -2119,11 +2338,10 @@ export default function App() {
                   setReviewRating(5);
                 }}
                 disabled={selectedProduct.stock <= 0}
-                className={`font-bold py-2 px-6 rounded-lg transition-colors text-xs shadow-md ${
-                  selectedProduct.stock <= 0
-                    ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
-                    : 'bg-rose-600 hover:bg-rose-550 text-white'
-                }`}
+                className={`font-bold py-2 px-6 rounded-lg transition-colors text-xs shadow-md ${selectedProduct.stock <= 0
+                  ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
+                  : 'bg-rose-600 hover:bg-rose-550 text-white'
+                  }`}
               >
                 {selectedProduct.stock <= 0 ? 'Sold Out' : 'Add to Cart'}
               </button>
@@ -2138,7 +2356,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-[2px] print:hidden animate-in fade-in duration-200">
           {/* Dismiss overlay */}
           <div className="absolute inset-0" onClick={() => setEditingProductId(null)} />
-          
+
           <div className="relative bg-white w-full max-w-md h-full shadow-2xl p-6 flex flex-col justify-between animate-in slide-in-from-right duration-300 text-slate-800 border-l border-rose-100/60 overflow-y-auto">
             <div>
               <div className="flex justify-between items-center border-b border-rose-100 pb-3 mb-4">
@@ -2189,10 +2407,10 @@ export default function App() {
                     min="0"
                     value={editStock}
                     onChange={(e) => setEditStock(e.target.value)}
-                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-400 focus:outline-none"
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-655 font-semibold mb-1">Catalog Discount Percentage (%) *</label>
@@ -2202,7 +2420,7 @@ export default function App() {
                       max="100"
                       value={editDiscount}
                       onChange={(e) => setEditDiscount(e.target.value)}
-                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-400 focus:outline-none"
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     />
                   </div>
 
@@ -2212,7 +2430,7 @@ export default function App() {
                     <select
                       value={editFestivalName}
                       onChange={(e) => setEditFestivalName(e.target.value)}
-                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-400 focus:outline-none"
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     >
                       <option value="">None / Standard</option>
                       {FESTIVAL_OPTIONS.map(f => (
@@ -2231,7 +2449,7 @@ export default function App() {
                       min="0"
                       value={editDeliveryCharge}
                       onChange={(e) => setEditDeliveryCharge(e.target.value)}
-                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-400 focus:outline-none"
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     />
                   </div>
                   <div>
@@ -2242,7 +2460,7 @@ export default function App() {
                       min="0"
                       value={editSafetyFee}
                       onChange={(e) => setEditSafetyFee(e.target.value)}
-                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-400 focus:outline-none"
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -2265,7 +2483,7 @@ export default function App() {
                       placeholder="https://example.com/image.jpg"
                       value={editProductImage}
                       onChange={(e) => setEditProductImage(e.target.value)}
-                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-400 focus:outline-none"
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -2285,7 +2503,7 @@ export default function App() {
                   </div>
                 </div>
               </form>
-              
+
               {/* Admin view reviews block */}
               {(() => {
                 const editingProduct = products.find((p) => p.id === editingProductId);
@@ -2299,7 +2517,7 @@ export default function App() {
                     </div>
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                       {revList.length === 0 ? (
-                        <p className="text-slate-400 italic">No reviews written for this product yet.</p>
+                        <p className="text-slate-405 italic">No reviews written for this product yet.</p>
                       ) : (
                         revList.map((r, i) => (
                           <div key={i} className="bg-rose-50/25 border border-rose-100/50 p-2.5 rounded-xl space-y-1 text-[11px]">
@@ -2332,6 +2550,33 @@ export default function App() {
                 className="flex-1 bg-rose-600 hover:bg-rose-550 text-white font-bold py-2.5 rounded-lg text-xs transition-colors shadow-md"
               >
                 Save Modifications
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {productToDeleteId && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
+          <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200 text-center text-slate-800">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold mb-3">⚠️</div>
+            <h3 className="text-lg font-bold font-serif mb-2 text-slate-800">Confirm Deletion</h3>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              Are you sure you want to permanently delete this product? This action will remove the garment from the database and cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setProductToDeleteId(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-705 font-bold py-2 rounded-lg text-xs transition-colors border border-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteProduct(productToDeleteId)}
+                className="flex-1 bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md"
+              >
+                Delete
               </button>
             </div>
           </div>
