@@ -86,24 +86,23 @@ export const pullProductsFromCloud = async (): Promise<number> => {
   }
 
   if (data && data.length > 0) {
-    for (const item of data) {
-      await db.products.put({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        description: item.description,
-        imageUrl: item.image_url,
-        category: item.category,
-        stock: item.stock,
-        discount: item.discount,
-        isFestiveDiscount: item.is_festive_discount,
-        festiveName: item.festive_name,
-        deliveryCharge: item.delivery_charge,
-        safetyFee: item.safety_fee,
-        isActive: item.is_active,
-        reviews: item.reviews || []
-      });
-    }
+    const productsToPut = data.map(item => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      imageUrl: item.image_url,
+      category: item.category,
+      stock: item.stock,
+      discount: item.discount,
+      isFestiveDiscount: item.is_festive_discount,
+      festiveName: item.festive_name,
+      deliveryCharge: item.delivery_charge,
+      safetyFee: item.safety_fee,
+      isActive: item.is_active,
+      reviews: item.reviews || []
+    }));
+    await db.products.bulkPut(productsToPut);
     return data.length;
   }
   return 0;

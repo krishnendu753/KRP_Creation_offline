@@ -135,6 +135,7 @@ export default function App() {
 
   // Global UI States (Loader & Toast)
   const [isLoading, setIsLoading] = useState(false);
+  const [isCatalogSyncing, setIsCatalogSyncing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -155,6 +156,7 @@ export default function App() {
   // Pull catalog products and global configurations from cloud on mount or online status change
   useEffect(() => {
     if (isOnline && isCloudConfigured()) {
+      setIsCatalogSyncing(true);
       pullProductsFromCloud()
         .then((count) => {
           if (count > 0) {
@@ -163,6 +165,9 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Cloud product sync failed: ", err);
+        })
+        .finally(() => {
+          setIsCatalogSyncing(false);
         });
 
       pullSettingsFromCloud()
@@ -1021,7 +1026,19 @@ export default function App() {
               )}
             </div>
 
-            {activeProducts.length === 0 ? (
+            {isCatalogSyncing && activeProducts.length === 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="bg-white border border-rose-100/60 rounded-2xl p-4 space-y-4 animate-pulse">
+                    <div className="bg-rose-50/60 h-64 w-full rounded-xl" />
+                    <div className="space-y-3">
+                      <div className="bg-rose-50/60 h-4 w-3/4 rounded" />
+                      <div className="bg-rose-50/60 h-3 w-1/2 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : activeProducts.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-rose-100 shadow-sm">
                 <p className="text-slate-550">Currently no products are visible in our catalog.</p>
               </div>
