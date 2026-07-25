@@ -130,3 +130,66 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
     throw new Error(error.message);
   }
 };
+
+// Push configurations to Supabase settings table
+export const syncSettingsToCloud = async (settings: {
+  gstEnabled: boolean;
+  cgstRate: number;
+  sgstRate: number;
+  packagingFee: number;
+  sellerInfoEnabled: boolean;
+}) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('settings')
+    .upsert({
+      id: 'global',
+      gst_enabled: settings.gstEnabled,
+      cgst_rate: settings.cgstRate,
+      sgst_rate: settings.sgstRate,
+      packaging_fee: settings.packagingFee,
+      seller_info_enabled: settings.sellerInfoEnabled,
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    console.error("Failed to push settings to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Pull global settings from Supabase
+export const pullSettingsFromCloud = async (): Promise<{
+  gstEnabled: boolean;
+  cgstRate: number;
+  sgstRate: number;
+  packagingFee: number;
+  sellerInfoEnabled: boolean;
+} | null> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('id', 'global')
+    .single();
+
+  if (error) {
+    console.error("Failed to fetch settings from cloud: ", error.message);
+    return null;
+  }
+
+  if (data) {
+    return {
+      gstEnabled: data.gst_enabled,
+      cgstRate: Number(data.cgst_rate),
+      sgstRate: Number(data.sgst_rate),
+      packagingFee: Number(data.packaging_fee),
+      sellerInfoEnabled: data.seller_info_enabled
+    };
+  }
+  return null;
+};

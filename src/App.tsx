@@ -6,7 +6,7 @@ import { db, type Product, type Order } from './db/db';
 import { loginUser, registerUser } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
-import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProductsFromCloud, syncOrdersToCloud } from './services/supabase';
+import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProductsFromCloud, syncOrdersToCloud, syncSettingsToCloud, pullSettingsFromCloud, getSupabaseClient } from './services/supabase';
 
 type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
 
@@ -121,6 +121,7 @@ export default function App() {
   const [editIsActive, setEditIsActive] = useState(true);
   const [editProductImage, setEditProductImage] = useState('');
   const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState('');
   const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || '');
   const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || '');
 
@@ -147,7 +148,7 @@ export default function App() {
     }
   }, [user]);
 
-  // Pull catalog products from cloud on mount or online status change
+  // Pull catalog products and global configurations from cloud on mount or online status change
   useEffect(() => {
     if (isOnline && isCloudConfigured()) {
       pullProductsFromCloud()
@@ -157,8 +158,89 @@ export default function App() {
           }
         })
         .catch((err) => {
-          console.error("Cloud synchronization failed: ", err);
+          console.error("Cloud product sync failed: ", err);
         });
+
+      pullSettingsFromCloud()
+        .then((sets) => {
+          if (sets) {
+            setGstEnabled(sets.gstEnabled);
+            setCgstRate(sets.cgstRate);
+            setSgstRate(sets.sgstRate);
+            setPackagingFee(sets.packagingFee);
+            setSellerInfoEnabled(sets.sellerInfoEnabled);
+
+            localStorage.setItem('fee_gst_enabled', String(sets.gstEnabled));
+            localStorage.setItem('fee_cgst', String(sets.cgstRate));
+            localStorage.setItem('fee_sgst', String(sets.sgstRate));
+            localStorage.setItem('fee_packaging', String(sets.packagingFee));
+            localStorage.setItem('seller_info_enabled', String(sets.sellerInfoEnabled));
+            console.log("Successfully synchronized shop settings from Cloud Database.");
+          }
+        })
+        .catch((err) => {
+          console.error("Cloud settings sync failed: ", err);
+        });
+
+      // Subscribe to live database updates (Supabase Realtime)
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        // Products realtime subscription
+        const productsChannel = supabase
+          .channel('realtime-products')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async (payload) => {
+            console.log('Realtime product change payload received: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.products.delete(payload.old.id);
+            } else {
+              const item = payload.new;
+              await db.products.put({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                description: item.description,
+                imageUrl: item.image_url,
+                category: item.category,
+                stock: item.stock,
+                discount: item.discount,
+                isFestiveDiscount: item.is_festive_discount,
+                festiveName: item.festive_name,
+                deliveryCharge: item.delivery_charge,
+                safetyFee: item.safety_fee,
+                isActive: item.is_active,
+                reviews: item.reviews || []
+              });
+            }
+          })
+          .subscribe();
+
+        // Settings realtime subscription
+        const settingsChannel = supabase
+          .channel('realtime-settings')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async (payload) => {
+            console.log('Realtime settings change payload received: ', payload);
+            if (payload.eventType !== 'DELETE') {
+              const sets = payload.new;
+              setGstEnabled(sets.gst_enabled);
+              setCgstRate(Number(sets.cgst_rate));
+              setSgstRate(Number(sets.sgst_rate));
+              setPackagingFee(Number(sets.packaging_fee));
+              setSellerInfoEnabled(sets.seller_info_enabled);
+
+              localStorage.setItem('fee_gst_enabled', String(sets.gst_enabled));
+              localStorage.setItem('fee_cgst', String(sets.cgst_rate));
+              localStorage.setItem('fee_sgst', String(sets.sgst_rate));
+              localStorage.setItem('fee_packaging', String(sets.packaging_fee));
+              localStorage.setItem('seller_info_enabled', String(sets.seller_info_enabled));
+            }
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(productsChannel);
+          supabase.removeChannel(settingsChannel);
+        };
+      }
     }
   }, [isOnline]);
 
@@ -216,17 +298,42 @@ export default function App() {
     }
   };
 
-  // File Upload Helper (converts to Base64 String)
+  // File Upload Helper (converts to Base64 String and compresses using Canvas)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast('Image size must be smaller than 2MB for offline database storage.', 'error');
-        return;
-      }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setter(reader.result as string);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max_width = 800;
+          const max_height = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > max_width) {
+              height *= max_width / width;
+              width = max_width;
+            }
+          } else {
+            if (height > max_height) {
+              width *= max_height / height;
+              height = max_height;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+            setter(compressedBase64);
+          }
+        };
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -471,8 +578,10 @@ export default function App() {
     try {
       const stockVal = parseInt(editStock);
       const discountVal = parseInt(editDiscount) || 0;
+      const priceVal = parseFloat(editPrice);
 
       await db.products.update(editingProductId, {
+        price: isNaN(priceVal) ? 0 : priceVal,
         stock: isNaN(stockVal) ? 0 : stockVal,
         discount: discountVal,
         isFestiveDiscount: !!editFestivalName,
@@ -577,14 +686,33 @@ export default function App() {
   };
 
   // Admin save global settings
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('fee_gst_enabled', String(gstEnabled));
     localStorage.setItem('fee_cgst', String(cgstRate));
     localStorage.setItem('fee_sgst', String(sgstRate));
     localStorage.setItem('fee_packaging', String(packagingFee));
     localStorage.setItem('seller_info_enabled', String(sellerInfoEnabled));
-    showToast('Taxes & Packaging configuration updated!', 'success');
+    
+    if (isCloudConfigured()) {
+      setIsLoading(true);
+      try {
+        await syncSettingsToCloud({
+          gstEnabled,
+          cgstRate,
+          sgstRate,
+          packagingFee,
+          sellerInfoEnabled
+        });
+        showToast('Taxes & Packaging configuration synced to Cloud!', 'success');
+      } catch (err) {
+        showToast('Failed to sync configurations to cloud.', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      showToast('Taxes & Packaging configuration updated locally!', 'success');
+    }
   };
 
   // Print invoice handler
@@ -1516,9 +1644,38 @@ export default function App() {
                         Save & Connect
                       </button>
                     </form>
-                    {isCloudConfigured() ? (
-                      <div className="text-[10px] text-emerald-600 font-bold bg-emerald-50 p-2.5 rounded-lg text-center border border-emerald-100">
-                        Connected to Cloud Database
+                    {isCloudConfigured() && isAdmin(user?.phone) ? (
+                      <div className="space-y-3">
+                        <div className="text-[10px] text-emerald-600 font-bold bg-emerald-50 p-2.5 rounded-lg text-center border border-emerald-100">
+                          Connected to Cloud Database
+                        </div>
+                        <div className="bg-rose-50/50 border border-rose-100 p-3 rounded-xl text-[10px] space-y-2 text-slate-700 font-medium">
+                          <div className="font-bold text-rose-700 uppercase tracking-widest text-[9px] mb-1">Active Credentials:</div>
+                          <div className="flex items-center justify-between gap-2 border-b border-rose-100/50 pb-1.5">
+                            <span className="truncate">URL: <strong>{supabaseUrl}</strong></span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(supabaseUrl);
+                                showToast('Project URL copied to clipboard!', 'success');
+                              }}
+                              className="text-[9px] bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate">Key: <strong>{supabaseKey}</strong></span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(supabaseKey);
+                                showToast('Anon Key copied to clipboard!', 'success');
+                              }}
+                              className="text-[9px] bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2.5 rounded-lg text-center border border-amber-100">
@@ -1705,6 +1862,7 @@ export default function App() {
                               onClick={() => {
                                 setEditingProductId(prod.id);
                                 setEditStock(String(prod.stock));
+                                setEditPrice(String(prod.price));
                                 setEditDiscount(String(prod.discount || ''));
                                 setEditFestivalName(prod.festiveName || '');
                                 setEditDeliveryCharge(String(prod.deliveryCharge || 0));
@@ -2399,6 +2557,18 @@ export default function App() {
               })()}
 
               <form id="editProductForm" onSubmit={handleUpdateProductSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-655 font-semibold mb-1">Edit Base Price (₹) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    min="0"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
+                  />
+                </div>
                 <div>
                   <label className="block text-slate-655 font-semibold mb-1">Update Stock Count *</label>
                   <input
