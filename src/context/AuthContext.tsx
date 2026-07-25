@@ -34,7 +34,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user_session');
+    localStorage.clear();
+    
+    // Purge browser assets cache
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        for (const name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+
+    // Purge IndexedDB databases
+    try {
+      indexedDB.deleteDatabase('OfflineEcommerceDB');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (

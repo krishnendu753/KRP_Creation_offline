@@ -1398,15 +1398,25 @@ export default function App() {
                           View / Print Receipt Bill
                         </button>
                         <span
-                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'synced'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
+                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${
+                            order.status === 'synced'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : order.status === 'rejected'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
                         >
-                          {order.status === 'synced' ? 'Placed Online' : 'Queued Offline'}
+                          {order.status === 'synced' ? 'Placed Online' : order.status === 'rejected' ? 'Rejected' : 'Queued Offline'}
                         </span>
                       </div>
                     </div>
+
+                    {order.status === 'rejected' && order.rejectionReason && (
+                      <div className="bg-rose-50 border border-rose-100 p-3.5 rounded-xl text-xs text-rose-850 animate-in fade-in duration-200">
+                        <div className="font-bold text-rose-800 mb-0.5">⚠️ Order Rejected by Seller:</div>
+                        <div>Reason: {order.rejectionReason}</div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                       {/* Products Summary list */}
@@ -2008,15 +2018,15 @@ export default function App() {
                             key={order.id}
                             className="bg-rose-50/30 border border-rose-100 p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm"
                           >
-                            <div className="flex justify-between items-start border-b border-rose-100/50 pb-2">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-rose-100/50 pb-2 gap-2">
                               <div>
                                 <span className="font-bold text-slate-800 font-mono">Order #{order.receiptId || `KRP-${order.id}`}</span>
-                                <span className="text-slate-400 text-xs ml-3">
+                                <span className="text-slate-400 text-xs md:ml-3 block md:inline mt-1 md:mt-0">
                                   {moment(order.createdAt).format('D MMMM YYYY hh:mm A')}
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                                 <button
                                   onClick={() => setActiveReceiptOrder(order)}
                                   className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-250 transition-colors"
