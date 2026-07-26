@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { db, type Product, type Order } from '../db/db';
+import { db, type Product, type Order, type Announcement, type EventItem } from '../db/db';
 
 const DEFAULT_SUPABASE_URL = 'https://ggbevhaudwhbpevjbdhq.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI';
@@ -46,6 +46,7 @@ export const syncProductToCloud = async (product: Product) => {
       safety_fee: product.safetyFee,
       is_active: product.isActive !== false,
       reviews: product.reviews || [],
+      sizes: product.sizes || [],
       updated_at: new Date().toISOString()
     });
 
@@ -100,7 +101,8 @@ export const pullProductsFromCloud = async (): Promise<number> => {
       deliveryCharge: item.delivery_charge,
       safetyFee: item.safety_fee,
       isActive: item.is_active,
-      reviews: item.reviews || []
+      reviews: item.reviews || [],
+      sizes: item.sizes || []
     }));
     await db.products.bulkPut(productsToPut);
     return data.length;
@@ -247,4 +249,122 @@ export const pullSettingsFromCloud = async (): Promise<{
     };
   }
   return null;
+};
+
+// Sync announcements to cloud
+export const syncAnnouncementToCloud = async (ann: Announcement) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('announcements')
+    .upsert({
+      id: ann.id,
+      content: ann.content,
+      live_url: ann.liveUrl || null,
+      updated_at: new Date(ann.updatedAt).toISOString()
+    });
+
+  if (error) {
+    console.error("Failed to sync announcement to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Pull latest announcements from cloud
+export const pullAnnouncementsFromCloud = async (): Promise<number> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('*');
+
+  if (error) {
+    console.error("Failed to pull announcements from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data && data.length > 0) {
+    const formatted = data.map(item => ({
+      id: item.id,
+      content: item.content,
+      liveUrl: item.live_url || undefined,
+      updatedAt: new Date(item.updated_at).getTime()
+    }));
+    await db.announcements.bulkPut(formatted);
+    return data.length;
+  }
+  return 0;
+};
+
+// Sync a single event item to cloud
+export const syncEventToCloud = async (ev: EventItem) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('events')
+    .upsert({
+      id: ev.id,
+      title: ev.title,
+      type: ev.type,
+      event_date: ev.eventDate,
+      event_end_date: ev.eventEndDate || null,
+      description: ev.description,
+      link_url: ev.linkUrl || null,
+      created_at: new Date(ev.createdAt).toISOString()
+    });
+
+  if (error) {
+    console.error("Failed to sync event to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Delete an event item from cloud
+export const deleteEventFromCloud = async (eventId: string) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('events')
+    .delete()
+    .eq('id', eventId);
+
+  if (error) {
+    console.error("Failed to delete event from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Pull all events from cloud
+export const pullEventsFromCloud = async (): Promise<number> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from('events')
+    .select('*');
+
+  if (error) {
+    console.error("Failed to pull events from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data && data.length > 0) {
+    const formatted = data.map(item => ({
+      id: item.id,
+      title: item.title,
+      type: item.type,
+      eventDate: item.event_date,
+      eventEndDate: item.event_end_date || undefined,
+      description: item.description,
+      linkUrl: item.link_url || undefined,
+      createdAt: new Date(item.created_at).getTime()
+    }));
+    await db.events.bulkPut(formatted);
+    return data.length;
+  }
+  return 0;
 };

@@ -2,11 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
-import { db, type Product, type Order } from './db/db';
+import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize } from './db/db';
 import { loginUser, registerUser } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
-import { isCloudConfigured, syncProductToCloud, deleteProductFromCloud, pullProductsFromCloud, syncOrdersToCloud, syncSettingsToCloud, pullSettingsFromCloud, getSupabaseClient, pullOrdersFromCloud } from './services/supabase';
+import {
+  isCloudConfigured,
+  syncProductToCloud,
+  deleteProductFromCloud,
+  pullProductsFromCloud,
+  syncOrdersToCloud,
+  syncSettingsToCloud,
+  pullSettingsFromCloud,
+  getSupabaseClient,
+  pullOrdersFromCloud,
+  syncAnnouncementToCloud,
+  pullAnnouncementsFromCloud,
+  syncEventToCloud,
+  deleteEventFromCloud,
+  pullEventsFromCloud
+} from './services/supabase';
 
 type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
 
@@ -134,6 +149,34 @@ export default function App() {
   const [cancellationReasonText, setCancellationReasonText] = useState('');
   const [readOrderIds, setReadOrderIds] = useState<string[]>(() => JSON.parse(localStorage.getItem('admin_read_order_ids') || '[]'));
 
+  // Sizes creation states (Admin input fields)
+  const [productSizesInput, setProductSizesInput] = useState<ProductSize[]>([
+    { size: 'S', length: '36 inches' },
+    { size: 'M', length: '38 inches' },
+    { size: 'L', length: '40 inches' },
+    { size: 'XL', length: '42 inches' },
+    { size: 'XXL', length: '44 inches' }
+  ]);
+  const [newSizeName, setNewSizeName] = useState('');
+  const [newSizeLength, setNewSizeLength] = useState('');
+  const [selectedUserSize, setSelectedUserSize] = useState<ProductSize | null>(null);
+
+  // Announcements & Events Admin States
+  const [announcementContent, setAnnouncementContent] = useState('');
+  const [facebookLiveUrl, setFacebookLiveUrl] = useState('');
+
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventType, setEventType] = useState<'live' | 'exhibition' | 'product_launch' | 'biggest_offer' | 'other'>('live');
+  const [eventDate, setEventDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
+  const [eventLink, setEventLink] = useState('');
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // Admin Dashboard Active Tab State
+  // tabs: 'inventory' | 'orders' | 'announcements' | 'events' | 'settings'
+  const [adminActiveTab, setAdminActiveTab] = useState<'inventory' | 'orders' | 'announcements' | 'events' | 'settings'>('inventory');
+
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -148,6 +191,8 @@ export default function App() {
   const products = useLiveQuery(() => db.products.toArray()) || [];
   const pendingOrders = useLiveQuery(() => db.orders.where('status').equals('pending_sync').toArray()) || [];
   const allOrders = useLiveQuery(() => db.orders.toArray()) || [];
+  const announcementsList = useLiveQuery(() => db.announcements.toArray()) || [];
+  const eventsList = useLiveQuery(() => db.events.toArray()) || [];
 
   // Automatically redirect based on user authentication state (Allowing 'home' tab view first)
   useEffect(() => {
@@ -211,6 +256,22 @@ export default function App() {
           console.error("Cloud orders sync failed: ", err);
         });
 
+      pullAnnouncementsFromCloud()
+        .then((count) => {
+          console.log(`Successfully synchronized ${count} announcements from Cloud Database.`);
+        })
+        .catch((err) => {
+          console.error("Cloud announcements sync failed: ", err);
+        });
+
+      pullEventsFromCloud()
+        .then((count) => {
+          console.log(`Successfully synchronized ${count} events from Cloud Database.`);
+        })
+        .catch((err) => {
+          console.error("Cloud events sync failed: ", err);
+        });
+
       // Subscribe to live database updates (Supabase Realtime)
       const supabase = getSupabaseClient();
       if (supabase) {
@@ -237,7 +298,8 @@ export default function App() {
                 deliveryCharge: item.delivery_charge,
                 safetyFee: item.safety_fee,
                 isActive: item.is_active,
-                reviews: item.reviews || []
+                reviews: item.reviews || [],
+                sizes: item.sizes || []
               };
               await db.products.put(updatedProduct);
               // If the user currently has this product open, update its state live
@@ -361,10 +423,53 @@ export default function App() {
           })
           .subscribe();
 
+        // Announcements realtime subscription
+        const announcementsChannel = supabase
+          .channel('realtime-announcements')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, async (payload) => {
+            console.log('Realtime announcement change: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.announcements.delete(payload.old.id);
+            } else {
+              const item = payload.new;
+              await db.announcements.put({
+                id: item.id,
+                content: item.content,
+                liveUrl: item.live_url || undefined,
+                updatedAt: new Date(item.updated_at).getTime()
+              });
+            }
+          })
+          .subscribe();
+
+        // Events realtime subscription
+        const eventsChannel = supabase
+          .channel('realtime-events')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, async (payload) => {
+            console.log('Realtime event change: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.events.delete(payload.old.id);
+            } else {
+              const item = payload.new;
+              await db.events.put({
+                id: item.id,
+                title: item.title,
+                type: item.type,
+                eventDate: item.event_date,
+                description: item.description,
+                linkUrl: item.link_url || undefined,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
+          })
+          .subscribe();
+
         return () => {
           supabase.removeChannel(productsChannel);
           supabase.removeChannel(settingsChannel);
           supabase.removeChannel(ordersChannel);
+          supabase.removeChannel(announcementsChannel);
+          supabase.removeChannel(eventsChannel);
         };
       }
     }
@@ -408,14 +513,20 @@ export default function App() {
   };
 
   // Wrapper for Add to Cart
-  const handleAddToCart = async (product: Product) => {
+  const handleAddToCart = async (product: Product, sizeOpt?: ProductSize) => {
     if (product.stock <= 0) {
       showToast('This product is currently sold out.', 'error');
       return;
     }
+    // If product has sizes and none passed, open detail modal instead of direct catalog add
+    if (product.sizes && product.sizes.length > 0 && !sizeOpt) {
+      setSelectedProduct(product);
+      setSelectedUserSize(null);
+      return;
+    }
     setIsLoading(true);
     try {
-      await addToCart(product.id);
+      await addToCart(product.id, sizeOpt);
       showToast(`${product.name} added to cart successfully!`, 'success');
     } catch (err) {
       showToast('Failed to add item to cart.', 'error');
@@ -497,13 +608,14 @@ export default function App() {
             productId: item.productId,
             quantity: item.quantity,
             priceAtPurchase: finalPrice,
+            selectedSize: item.selectedSize
           });
-          
+
           originalSubtotal += prod.price * item.quantity;
           totalDiscountSaved += (prod.price - finalPrice) * item.quantity;
           totalDeliverySum += (prod.deliveryCharge || 0) * item.quantity;
           totalSafetySum += (prod.safetyFee || 0) * item.quantity;
-          
+
           // Decrement stock count
           const newStock = Math.max(0, prod.stock - item.quantity);
           await db.products.update(prod.id, { stock: newStock });
@@ -546,7 +658,7 @@ export default function App() {
 
       const newOrderId = await db.orders.add(orderData);
       const createdOrder = await db.orders.get(newOrderId);
-      
+
       await clearCart();
       setIsPaymentOpen(false);
 
@@ -671,7 +783,8 @@ export default function App() {
         deliveryCharge: parseFloat(newProductDelivery) || 0,
         safetyFee: parseFloat(newProductSafety) || 0,
         isActive: true,
-        reviews: []
+        reviews: [],
+        sizes: [...productSizesInput]
       };
       await db.products.add(newProductObj);
       if (isCloudConfigured()) {
@@ -685,6 +798,13 @@ export default function App() {
       setNewProductDelivery('50');
       setNewProductSafety('10');
       setNewProductFestival('');
+      setProductSizesInput([
+        { size: 'S', length: '36 inches' },
+        { size: 'M', length: '38 inches' },
+        { size: 'L', length: '40 inches' },
+        { size: 'XL', length: '42 inches' },
+        { size: 'XXL', length: '44 inches' }
+      ]);
       // Reset file input
       const fileInput = document.getElementById('newProductFileInput') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
@@ -715,7 +835,8 @@ export default function App() {
         deliveryCharge: parseFloat(editDeliveryCharge) || 0,
         safetyFee: parseFloat(editSafetyFee) || 0,
         isActive: editIsActive,
-        imageUrl: editProductImage || ''
+        imageUrl: editProductImage || '',
+        sizes: [...productSizesInput]
       });
 
       if (isCloudConfigured()) {
@@ -887,7 +1008,7 @@ export default function App() {
     localStorage.setItem('fee_sgst', String(sgstRate));
     localStorage.setItem('fee_packaging', String(packagingFee));
     localStorage.setItem('seller_info_enabled', String(sellerInfoEnabled));
-    
+
     if (isCloudConfigured()) {
       setIsLoading(true);
       try {
@@ -906,6 +1027,103 @@ export default function App() {
       }
     } else {
       showToast('Taxes & Packaging configuration updated locally!', 'success');
+    }
+  };
+
+  // Admin save announcement & live URL
+  const handleSaveAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const annObj: Announcement = {
+        id: 'global',
+        content: announcementContent.trim(),
+        liveUrl: facebookLiveUrl.trim() || undefined,
+        updatedAt: Date.now()
+      };
+      await db.announcements.put(annObj);
+      if (isCloudConfigured()) {
+        await syncAnnouncementToCloud(annObj);
+      }
+      showToast('Announcement and Facebook Live settings updated!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save announcements/Live URL.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin create or update Event / Exhibition
+  const handleAddEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventTitle || !eventDate) {
+      showToast('Please fill in both Title and Date.', 'error');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      if (editingEventId) {
+        const evObj: EventItem = {
+          id: editingEventId,
+          title: eventTitle.trim(),
+          type: eventType,
+          eventDate: eventDate,
+          eventEndDate: eventEndDate || undefined,
+          description: eventDescription.trim(),
+          linkUrl: eventLink.trim() || undefined,
+          createdAt: Date.now()
+        };
+        await db.events.put(evObj);
+        if (isCloudConfigured()) {
+          await syncEventToCloud(evObj);
+        }
+        showToast('Scheduled Event updated successfully!', 'success');
+        setEditingEventId(null);
+      } else {
+        const evObj: EventItem = {
+          id: 'ev_' + Math.random().toString(36).substr(2, 9),
+          title: eventTitle.trim(),
+          type: eventType,
+          eventDate: eventDate,
+          eventEndDate: eventEndDate || undefined,
+          description: eventDescription.trim(),
+          linkUrl: eventLink.trim() || undefined,
+          createdAt: Date.now()
+        };
+        await db.events.add(evObj);
+        if (isCloudConfigured()) {
+          await syncEventToCloud(evObj);
+        }
+        showToast('Upcoming Event scheduled successfully!', 'success');
+      }
+      setEventTitle('');
+      setEventDate('');
+      setEventEndDate('');
+      setEventDescription('');
+      setEventLink('');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to schedule/update event.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin delete Event
+  const handleDeleteEvent = async (eventId: string) => {
+    setIsLoading(true);
+    try {
+      await db.events.delete(eventId);
+      if (isCloudConfigured()) {
+        await deleteEventFromCloud(eventId);
+      }
+      showToast('Event removed successfully.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete event.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1061,7 +1279,7 @@ export default function App() {
               </span>
             )}
           </button>
-          
+
           {/* Customer Past Orders tab */}
           {user && (
             <button
@@ -1072,7 +1290,7 @@ export default function App() {
               My Orders
             </button>
           )}
-          
+
           {/* Admin panel tab is strictly visible only to logged-in admin */}
           {isAdmin(user?.phone) && (
             <button
@@ -1095,8 +1313,8 @@ export default function App() {
           <div className="flex items-center gap-2 text-xs text-slate-600 bg-rose-50/40 px-3 py-1 rounded-xl border border-rose-100/50 max-w-full overflow-hidden shrink-0">
             <span className="font-semibold text-slate-700 truncate max-w-[100px] sm:max-w-[150px]">Hi, {user.name}</span>
             <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-bold ${isAdmin(user.phone)
-                ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+              ? 'bg-rose-100 text-rose-700 border border-rose-200'
+              : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
               }`}>
               {isAdmin(user.phone) ? 'Admin' : 'User'}
             </span>
@@ -1118,11 +1336,48 @@ export default function App() {
       </nav>
 
       {/* Main Content Areas */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 print:hidden">
-        
+      <main className="flex-1 max-w-7xl w-full mx-auto p-2 md:p-2 print:hidden">
+
         {/* Home Landing Page */}
         {currentPage === 'home' && (
-          <div className="space-y-12 animate-in fade-in duration-300">
+          <div className="space-y-1 animate-in fade-in duration-300">
+            {/* Announcements Ticker */}
+            {announcementsList.length > 0 && announcementsList[0].content && (
+              <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-pink-600 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-rose-500/10 flex items-center gap-3 max-w-2xl mx-auto border border-rose-400/20 animate-pulse">
+                <span className="font-black uppercase tracking-wider text-[9px] bg-white text-rose-600 px-2 py-0.5 rounded-md shrink-0 shadow-sm">NEW</span>
+                <div className="text-xs font-extrabold truncate flex-1 tracking-wide">
+                  📢 {announcementsList[0].content}
+                </div>
+              </div>
+            )}
+
+            {/* Active Facebook Live Stream Section */}
+            {announcementsList.length > 0 && announcementsList[0].liveUrl && (
+              <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-3xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4 border border-blue-500/20">
+                <div className="flex items-center gap-4 text-center sm:text-left">
+                  <span className="relative flex h-3.5 w-3.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
+                  </span>
+                  <div>
+                    <h3 className="text-base font-extrabold tracking-tight">KRP Live is Streaming Now on Facebook!</h3>
+                    <p className="text-xs text-blue-100 mt-0.5">Watch our latest models, catalog preview, and exclusive festive designs live.</p>
+                  </div>
+                </div>
+                <a
+                  href={announcementsList[0].liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 shrink-0 flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                  </svg>
+                  Join Facebook Live Stream
+                </a>
+              </div>
+            )}
+
             {/* Hero Section */}
             <div className="relative bg-white rounded-3xl overflow-hidden border border-rose-100 shadow-sm p-6 sm:p-12 flex flex-col md:flex-row items-center gap-8">
               <div className="flex-1 space-y-6 text-center md:text-left">
@@ -1197,6 +1452,49 @@ export default function App() {
                 </p>
               </div>
             </div>
+
+            {/* Upcoming Events / Exhibitions Timeline Scheduler View */}
+            {eventsList.length > 0 && (
+              <div className="bg-white border border-rose-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+                <div className="text-center space-y-2 max-w-xl mx-auto">
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-800 font-serif">Upcoming Events & Exhibitions</h2>
+                  <p className="text-xs text-slate-450">Join our upcoming product launches, boutique pop-ups, and live event displays.</p>
+                </div>
+                <div className="relative border-l border-rose-150 ml-4 pl-6 space-y-8 py-3">
+                  {eventsList.map((ev) => (
+                    <div key={ev.id} className="relative group">
+                      {/* Timeline dot */}
+                      <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 border border-white shadow-sm ring-4 ring-rose-50" />
+                      <div className="bg-rose-50/20 hover:bg-rose-50/40 border border-rose-100/50 p-5 rounded-2xl transition-all shadow-sm space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-50 pb-2">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 tracking-wider">
+                              {ev.type === 'live' ? '🎥 Live Show' : ev.type === 'exhibition' ? '🎪 Exhibition Pop-Up' : ev.type === 'product_launch' ? '🛍️ Product Launch' : ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special Event'}
+                            </span>
+                            <h4 className="font-bold text-sm sm:text-base text-slate-800 mt-1">{ev.title}</h4>
+                          </div>
+                          <span className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1 shrink-0">
+                            📅 {moment(ev.eventDate).format('D MMM YYYY')} 
+                            {ev.eventEndDate && ` - ${moment(ev.eventEndDate).format('D MMM YYYY')}`}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-550 leading-relaxed">{ev.description}</p>
+                        {ev.linkUrl && (
+                          <a
+                            href={ev.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-xs font-bold text-rose-700 hover:text-rose-800 mt-2 hover:underline"
+                          >
+                            Find details & join stream ➜
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Fabric Spotlight block */}
             <div className="bg-rose-50/40 border border-rose-100 p-6 sm:p-8 rounded-3xl text-center max-w-3xl mx-auto space-y-4">
@@ -1364,8 +1662,8 @@ export default function App() {
                             }}
                             disabled={isSoldOut}
                             className={`text-xs font-bold py-2 px-4 rounded-lg transition-colors shadow-sm ${isSoldOut
-                                ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
-                                : 'bg-rose-600 hover:bg-rose-500 text-white'
+                              ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
+                              : 'bg-rose-600 hover:bg-rose-500 text-white'
                               }`}
                           >
                             Add to Cart
@@ -1425,6 +1723,11 @@ export default function App() {
                           <div className="text-[10px] text-slate-400 mt-1">
                             Charges: Del ₹{prod.deliveryCharge || 0} • Saf ₹{prod.safetyFee || 0}
                           </div>
+                          {item.selectedSize && (
+                            <div className="mt-1 text-[10px] text-rose-700 bg-rose-50 border border-rose-100 rounded-md px-2 py-0.5 w-fit font-bold">
+                              📏 Size: {item.selectedSize.size} ({item.selectedSize.length})
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -1558,15 +1861,14 @@ export default function App() {
                           </button>
                         )}
                         <span
-                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${
-                            order.status === 'synced'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : order.status === 'rejected'
+                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'synced'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : order.status === 'rejected'
                               ? 'bg-rose-50 text-rose-750 border-rose-200'
                               : order.status === 'cancelled'
-                              ? 'bg-slate-100 text-slate-600 border-slate-300'
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}
+                                ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}
                         >
                           {order.status === 'synced' ? 'Placed Online' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled' : 'Queued Offline'}
                         </span>
@@ -1782,545 +2084,864 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="space-y-6">
 
-                {/* Add Product and Manage Product controls */}
-                <div className="lg:col-span-1 space-y-6">
-
-                  {/* Fee & Tax configuration panel (With GST toggle permission) */}
-                  <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
-                    <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-850">Taxes & Packaging Configuration</h3>
-                    <form onSubmit={handleSaveSettings} className="space-y-3 text-xs">
-
-                      {/* GST Toggle Switch */}
-                      <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60 mb-2">
-                        <input
-                          type="checkbox"
-                          id="gstToggle"
-                          checked={gstEnabled}
-                          onChange={(e) => setGstEnabled(e.target.checked)}
-                          className="accent-rose-650 cursor-pointer h-4 w-4"
-                        />
-                        <label htmlFor="gstToggle" className="text-slate-700 font-bold cursor-pointer">
-                          Enable GST & CGST Taxes
-                        </label>
-                      </div>
-
-                      {gstEnabled && (
-                        <div className="grid grid-cols-2 gap-2.5 animate-in fade-in duration-150">
-                          <div>
-                            <label className="block text-slate-500 mb-1">CGST (%)</label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={cgstRate}
-                              onChange={(e) => setCgstRate(parseFloat(e.target.value) || 0)}
-                              className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-500 mb-1">SGST (%)</label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={sgstRate}
-                              onChange={(e) => setSgstRate(parseFloat(e.target.value) || 0)}
-                              className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="block text-slate-500 mb-1">Packaging Fee (₹)</label>
-                        <input
-                          type="number"
-                          value={packagingFee}
-                          onChange={(e) => setPackagingFee(parseFloat(e.target.value) || 0)}
-                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
-                        />
-                      </div>
-
-                      {/* Seller Info Toggle Switch */}
-                      <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60 mb-2">
-                        <input
-                          type="checkbox"
-                          id="sellerToggle"
-                          checked={sellerInfoEnabled}
-                          onChange={(e) => setSellerInfoEnabled(e.target.checked)}
-                          className="accent-rose-650 cursor-pointer h-4 w-4"
-                        />
-                        <label htmlFor="sellerToggle" className="text-slate-700 font-bold cursor-pointer">
-                          Show Seller Contact Details
-                        </label>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-[11px]"
-                      >
-                        Save Configurations
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Cloud Sync Connector configuration */}
-                  <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
-                    <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-850">Cloud Sync Connector (Supabase)</h3>
-                    <form onSubmit={async (e) => {
-                      e.preventDefault();
-                      localStorage.setItem('supabase_url', supabaseUrl.trim());
-                      localStorage.setItem('supabase_key', supabaseKey.trim());
-                      showToast('Supabase Cloud credentials updated!', 'success');
-                      if (supabaseUrl.trim() && supabaseKey.trim()) {
-                        setIsLoading(true);
-                        try {
-                          const count = await pullProductsFromCloud();
-                          showToast(`Initial sync completed: loaded ${count} products!`, 'success');
-                        } catch (err: any) {
-                          console.error('Cloud sync failed:', err);
-                          showToast(`Sync failed: ${err.message || 'Check URL and Key.'}`, 'error');
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }
-                    }} className="space-y-3 text-xs">
-                      <div>
-                        <label className="block text-slate-500 mb-1">Supabase Project URL</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="https://xxxx.supabase.co"
-                          value={supabaseUrl}
-                          onChange={(e) => setSupabaseUrl(e.target.value)}
-                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-500 mb-1">Supabase Anon Key</label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="eyJhbGciOi..."
-                          value={supabaseKey}
-                          onChange={(e) => setSupabaseKey(e.target.value)}
-                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
-                      >
-                        Save & Connect
-                      </button>
-                    </form>
-                    {isAdmin(user?.phone) && (
-                      <div className="space-y-3">
-                        <div className={`text-[10px] font-bold p-2.5 rounded-lg text-center border ${
-                          isCloudConfigured() 
-                            ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
-                            : 'text-amber-600 bg-amber-50 border-amber-100'
-                        }`}>
-                          {isCloudConfigured() ? 'Connected to Cloud Database' : 'Running in Local-Only Mode'}
-                        </div>
-                        <div className="bg-rose-50/50 border border-rose-100 p-3 rounded-xl text-[10px] space-y-2 text-slate-700 font-medium">
-                          <div className="font-bold text-rose-700 uppercase tracking-widest text-[9px] mb-1">Active Credentials:</div>
-                          <div className="flex items-center justify-between gap-2 border-b border-rose-100/50 pb-1.5">
-                            <span className="truncate">URL: <strong>{supabaseUrl || '(Not Set)'}</strong></span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (supabaseUrl) {
-                                  navigator.clipboard.writeText(supabaseUrl);
-                                  showToast('Project URL copied to clipboard!', 'success');
-                                }
-                              }}
-                              disabled={!supabaseUrl}
-                              className="text-[9px] bg-rose-100 hover:bg-rose-200 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate">Key: <strong>{supabaseKey ? `${supabaseKey.substring(0, 15)}...` : '(Not Set)'}</strong></span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (supabaseKey) {
-                                  navigator.clipboard.writeText(supabaseKey);
-                                  showToast('Anon Key copied to clipboard!', 'success');
-                                }
-                              }}
-                              disabled={!supabaseKey}
-                              className="text-[9px] bg-rose-100 hover:bg-rose-200 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                {/* Admin Tab Selector */}
+                <div className="flex flex-wrap gap-2 border-b border-rose-100 pb-3">
+                  <button
+                    onClick={() => setAdminActiveTab('inventory')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'inventory'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    🛍️ Catalog & Inventory
+                  </button>
+                  <button
+                    onClick={() => setAdminActiveTab('orders')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${adminActiveTab === 'orders'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    📦 Orders Log
+                    {unreadOrdersCount > 0 && (
+                      <span className="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                        {unreadOrdersCount}
+                      </span>
                     )}
-                  </div>
-
-                  {/* Add Product form */}
-                  <div className="bg-white border border-rose-100 rounded-2xl p-5 h-fit space-y-4 shadow-sm">
-                    <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">Add New Catalog Product</h3>
-                    <form onSubmit={handleAddProduct} className="space-y-4 text-sm">
-                      <div>
-                        <label className="block text-slate-600 mb-1">Product Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={newProductName}
-                          onChange={(e) => setNewProductName(e.target.value)}
-                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-slate-600 mb-1">Price (₹)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            required
-                            min="0"
-                            value={newProductPrice}
-                            onChange={(e) => setNewProductPrice(e.target.value)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-600 mb-1">Del Charge (₹)</label>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            value={newProductDelivery}
-                            onChange={(e) => setNewProductDelivery(e.target.value)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-600 mb-1">Safety Fee (₹)</label>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            value={newProductSafety}
-                            onChange={(e) => setNewProductSafety(e.target.value)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-slate-600 mb-1">Description</label>
-                        <textarea
-                          required
-                          value={newProductDesc}
-                          onChange={(e) => setNewProductDesc(e.target.value)}
-                          className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none h-16"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-slate-600 mb-1">Category</label>
-                          <select
-                            value={newProductCategory}
-                            onChange={(e) => setNewProductCategory(e.target.value)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
-                          >
-                            <option value="Saree">Saree</option>
-                            <option value="Dress">Dress</option>
-                            <option value="Kurti">Kurti</option>
-                            <option value="Salwar Suit">Salwar Suit</option>
-                            <option value="Jackets">Jackets</option>
-                          </select>
-                        </div>
-
-                        {/* Festival selector */}
-                        <div>
-                          <label className="block text-slate-600 mb-1">Festive Offer</label>
-                          <select
-                            value={newProductFestival}
-                            onChange={(e) => setNewProductFestival(e.target.value)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
-                          >
-                            <option value="">None / Standard</option>
-                            {FESTIVAL_OPTIONS.map(f => (
-                              <option key={f} value={f}>{f}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Image Source - URL or File upload options */}
-                      <div className="space-y-3 pt-1 border-t border-rose-50">
-                        <div>
-                          <label className="block text-slate-600 mb-1">Upload Product Image</label>
-                          <input
-                            id="newProductFileInput"
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleFileUpload(e, setNewProductImage)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:outline-none text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-600 mb-1">Or Paste Image URL</label>
-                          <input
-                            type="text"
-                            placeholder="https://example.com/image.jpg"
-                            value={newProductImage}
-                            onChange={(e) => setNewProductImage(e.target.value)}
-                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none text-xs"
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
-                      >
-                        Save Product to Database
-                      </button>
-                    </form>
-                  </div>
-
+                  </button>
+                  <button
+                    onClick={() => setAdminActiveTab('announcements')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'announcements'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    📢 Announcements & Live
+                  </button>
+                  <button
+                    onClick={() => setAdminActiveTab('events')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'events'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    📅 Scheduled Events
+                  </button>
+                  <button
+                    onClick={() => setAdminActiveTab('settings')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'settings'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    ⚙️ Taxes & Settings
+                  </button>
                 </div>
 
-                {/* Orders dashboard + Manage stock list */}
-                <div className="lg:col-span-2 space-y-6">
+                {/* Tab content area */}
+                <div className="animate-in fade-in duration-200">
 
-                  {/* Products stock, pricing fees, and visibility management list */}
-                  <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm">
-                    <h3 className="font-bold text-lg text-slate-800 border-b border-rose-50 pb-2 mb-4">Stock, Fees & Visibility Editor</h3>
-                    <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-                      {products.map((prod) => (
-                        <div key={prod.id} className="bg-rose-50/20 border border-rose-100/60 p-3 rounded-xl flex items-center justify-between gap-4 text-xs shadow-inner">
-                          <div className="flex gap-2.5 items-center">
-                            {prod.imageUrl ? (
-                              <img src={prod.imageUrl} alt={prod.name} className="w-12 h-12 object-cover rounded bg-rose-50 shrink-0" />
-                            ) : (
-                              <div className="w-12 h-12 flex items-center justify-center bg-rose-100 text-rose-505 rounded shrink-0 font-bold text-[8px]">
-                                No Image
-                              </div>
-                            )}
+                  {/* INVENTORY TAB */}
+                  {adminActiveTab === 'inventory' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-1 space-y-6">
+                        {/* Add Product form */}
+                        <div className="bg-white border border-rose-100 rounded-2xl p-5 h-fit space-y-4 shadow-sm">
+                          <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">Add New Catalog Product</h3>
+                          <form onSubmit={handleAddProduct} className="space-y-4 text-sm">
                             <div>
-                              <div className="font-bold text-slate-805 flex items-center gap-1.5">
-                                <span>{prod.name}</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${prod.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                  }`}>
-                                  {prod.isActive !== false ? 'Active' : 'Inactive'}
-                                </span>
-                              </div>
-                              <div className="text-slate-500 mt-0.5">
-                                Price: ₹{prod.price.toFixed(2)} • Stock: <span className={`font-semibold ${prod.stock <= 0 ? 'text-rose-600' : 'text-slate-700'}`}>{prod.stock}</span>
-                              </div>
-                              <div className="text-[10px] text-slate-450 mt-0.5">
-                                Del Charge: ₹{prod.deliveryCharge || 0} • Safety Fee: ₹{prod.safetyFee || 0}
-                              </div>
-                              {prod.discount && prod.discount > 0 ? (
-                                <div className="text-rose-600 font-bold mt-0.5">Offer: {prod.discount}% OFF {prod.isFestiveDiscount ? `(${prod.festiveName || 'Festive'} Active)` : ''}</div>
-                              ) : null}
+                              <label className="block text-slate-600 mb-1">Product Name</label>
+                              <input
+                                type="text"
+                                required
+                                value={newProductName}
+                                onChange={(e) => setNewProductName(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
+                              />
                             </div>
-                          </div>
-
-                          <div className="flex gap-1.5 shrink-0">
-                            {/* Fast Active / Inactive toggle */}
-                            <button
-                              onClick={() => handleToggleProductActive(prod.id, prod.isActive !== false)}
-                              className={`px-2 py-1 rounded font-semibold border ${prod.isActive !== false
-                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                }`}
-                            >
-                              {prod.isActive !== false ? 'Hide' : 'Show'}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingProductId(prod.id);
-                                setEditStock(String(prod.stock));
-                                setEditPrice(String(prod.price));
-                                setEditDiscount(String(prod.discount || ''));
-                                setEditFestivalName(prod.festiveName || '');
-                                setEditDeliveryCharge(String(prod.deliveryCharge || 0));
-                                setEditSafetyFee(String(prod.safetyFee || 0));
-                                setEditIsActive(prod.isActive !== false);
-                                setEditProductImage(prod.imageUrl || '');
-                              }}
-                              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded font-semibold"
-                            >
-                              Edit details
-                            </button>
-                            <button
-                              onClick={() => setProductToDeleteId(prod.id)}
-                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold transition-colors"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Orders Log */}
-                  <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-rose-50 pb-3">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-lg text-slate-805">Orders Log</h3>
-                        {unreadOrdersCount > 0 && (
-                          <span className="bg-rose-100 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">
-                            {unreadOrdersCount} New
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {unreadOrdersCount > 0 && (
-                          <button
-                            onClick={handleMarkAllOrdersRead}
-                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-1 px-3 rounded-lg text-xs transition-colors border border-rose-200"
-                          >
-                            Mark all as read
-                          </button>
-                        )}
-                        {pendingOrders.length > 0 && (
-                          <button
-                            onClick={handleSyncOrders}
-                            className="bg-emerald-600 hover:bg-emerald-550 text-white font-semibold py-1 px-3 rounded-lg text-xs transition-colors"
-                          >
-                            Sync Offline Orders ({pendingOrders.length})
-                          </button>
-                        )}
-                        <button
-                          onClick={handleRefreshOrders}
-                          disabled={!isOnline || isLoading}
-                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg text-xs transition-colors border border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isLoading ? 'Refreshing...' : '↻ Refresh Orders'}
-                        </button>
-                      </div>
-                    </div>
-                    {allOrders.length === 0 ? (
-                      <p className="text-slate-405 text-sm">No orders registered on this device.</p>
-                    ) : (
-                      <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        {allOrders.map((order) => (
-                          <div
-                            key={order.id}
-                            className={`p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm relative border ${
-                              !readOrderIds.includes(String(order.id))
-                                ? 'border-rose-300 bg-rose-50/50 shadow-md shadow-rose-100/50 ring-1 ring-rose-200'
-                                : 'border-rose-100 bg-rose-50/30'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start border-b border-rose-100/50 pb-2 gap-2">
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                                <span className="font-bold text-slate-800 font-mono text-xs sm:text-sm">Order #{order.receiptId || `KRP-${order.id}`}</span>
-                                <span className="text-slate-400 text-[10px] sm:text-xs">
-                                  {moment(order.createdAt).format('D MMMM YYYY hh:mm A')}
-                                </span>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-slate-600 mb-1">Price (₹)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  required
+                                  min="0"
+                                  value={newProductPrice}
+                                  onChange={(e) => setNewProductPrice(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-slate-600 mb-1">Del Charge (₹)</label>
+                                <input
+                                  type="number"
+                                  required
+                                  min="0"
+                                  value={newProductDelivery}
+                                  onChange={(e) => setNewProductDelivery(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-slate-600 mb-1">Safety Fee (₹)</label>
+                                <input
+                                  type="number"
+                                  required
+                                  min="0"
+                                  value={newProductSafety}
+                                  onChange={(e) => setNewProductSafety(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-slate-600 mb-1">Description</label>
+                              <textarea
+                                required
+                                value={newProductDesc}
+                                onChange={(e) => setNewProductDesc(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none h-16"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-slate-600 mb-1">Category</label>
+                                <select
+                                  value={newProductCategory}
+                                  onChange={(e) => setNewProductCategory(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
+                                >
+                                  <option value="Saree">Saree</option>
+                                  <option value="Dress">Dress</option>
+                                  <option value="Kurti">Kurti</option>
+                                  <option value="Salwar Suit">Salwar Suit</option>
+                                  <option value="Jackets">Jackets</option>
+                                </select>
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                <button
-                                  onClick={() => {
-                                    setActiveReceiptOrder(order);
-                                    if (!readOrderIds.includes(String(order.id))) {
-                                      const updated = [...readOrderIds, String(order.id)];
-                                      setReadOrderIds(updated);
-                                      localStorage.setItem('admin_read_order_ids', JSON.stringify(updated));
-                                    }
-                                  }}
-                                  className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-250 transition-colors"
+                              {/* Festival selector */}
+                              <div>
+                                <label className="block text-slate-600 mb-1">Festive Offer</label>
+                                <select
+                                  value={newProductFestival}
+                                  onChange={(e) => setNewProductFestival(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
                                 >
-                                  View / Print Bill
+                                  <option value="">None / Standard</option>
+                                  {FESTIVAL_OPTIONS.map(f => (
+                                    <option key={f} value={f}>{f}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Product Sizes Creator section inside product add form */}
+                            <div className="space-y-2 border-t border-rose-100 pt-3.5">
+                              <label className="block text-xs font-bold text-slate-700">Add Product Sizes & Lengths *</label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. S, M, L"
+                                  value={newSizeName}
+                                  onChange={(e) => setNewSizeName(e.target.value.toUpperCase())}
+                                  className="w-1/2 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 36 inches"
+                                  value={newSizeLength}
+                                  onChange={(e) => setNewSizeLength(e.target.value)}
+                                  className="w-1/2 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!newSizeName.trim()) return;
+                                    setProductSizesInput(prev => [...prev, { size: newSizeName.trim(), length: newSizeLength.trim() || 'N/A' }]);
+                                    setNewSizeName('');
+                                    setNewSizeLength('');
+                                  }}
+                                  className="bg-rose-600 hover:bg-rose-550 text-white font-bold text-xs px-3 rounded-lg"
+                                >
+                                  +
                                 </button>
-                                {order.status !== 'rejected' && order.status !== 'cancelled' && (
+                              </div>
+
+                              <div className="flex flex-wrap gap-1.5 pt-1.5">
+                                {productSizesInput.map((sz, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-150 rounded-full px-2.5 py-0.5 text-xs text-rose-800 font-medium">
+                                    {sz.size} ({sz.length})
+                                    <button
+                                      type="button"
+                                      onClick={() => setProductSizesInput(prev => prev.filter((_, i) => i !== idx))}
+                                      className="text-rose-400 hover:text-rose-600 font-bold"
+                                    >
+                                      ✕
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Image Source - URL or File upload options */}
+                            <div className="space-y-3 pt-1 border-t border-rose-50">
+                              <div>
+                                <label className="block text-slate-600 mb-1">Upload Product Image</label>
+                                <input
+                                  id="newProductFileInput"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, setNewProductImage)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:outline-none text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-slate-600 mb-1">Or Paste Image URL</label>
+                                <input
+                                  type="text"
+                                  placeholder="https://example.com/image.jpg"
+                                  value={newProductImage}
+                                  onChange={(e) => setNewProductImage(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <button
+                              type="submit"
+                              className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
+                            >
+                              Save Product to Database
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        {/* Products stock, pricing fees, and visibility management list */}
+                        <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm">
+                          <h3 className="font-bold text-lg text-slate-800 border-b border-rose-50 pb-2 mb-4">Stock, Fees & Visibility Editor</h3>
+                          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                            {products.map((prod) => (
+                              <div key={prod.id} className="bg-rose-50/20 border border-rose-100/60 p-3 rounded-xl flex items-center justify-between gap-4 text-xs shadow-inner">
+                                <div className="flex gap-2.5 items-center">
+                                  {prod.imageUrl ? (
+                                    <img src={prod.imageUrl} alt={prod.name} className="w-12 h-12 object-cover rounded bg-rose-50 shrink-0" />
+                                  ) : (
+                                    <div className="w-12 h-12 flex items-center justify-center bg-rose-100 text-rose-505 rounded shrink-0 font-bold text-[8px]">
+                                      No Image
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="font-bold text-slate-805 flex items-center gap-1.5">
+                                      <span>{prod.name}</span>
+                                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${prod.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                        {prod.isActive !== false ? 'Active' : 'Inactive'}
+                                      </span>
+                                    </div>
+                                    <div className="text-slate-500 mt-0.5">
+                                      Price: ₹{prod.price.toFixed(2)} • Stock: <span className={`font-semibold ${prod.stock <= 0 ? 'text-rose-600' : 'text-slate-700'}`}>{prod.stock}</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-450 mt-0.5">
+                                      Del Charge: ₹{prod.deliveryCharge || 0} • Safety Fee: ₹{prod.safetyFee || 0}
+                                    </div>
+                                    {prod.sizes && prod.sizes.length > 0 && (
+                                      <div className="text-[10px] text-slate-500 mt-0.5">
+                                        Sizes: <strong>{prod.sizes.map(s => `${s.size} (${s.length})`).join(', ')}</strong>
+                                      </div>
+                                    )}
+                                    {prod.discount && prod.discount > 0 ? (
+                                      <div className="text-rose-600 font-bold mt-0.5">Offer: {prod.discount}% OFF {prod.isFestiveDiscount ? `(${prod.festiveName || 'Festive'} Active)` : ''}</div>
+                                    ) : null}
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-1.5 shrink-0">
+                                  {/* Fast Active / Inactive toggle */}
+                                  <button
+                                    onClick={() => handleToggleProductActive(prod.id, prod.isActive !== false)}
+                                    className={`px-2 py-1 rounded font-semibold border ${prod.isActive !== false
+                                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                      }`}
+                                  >
+                                    {prod.isActive !== false ? 'Hide' : 'Show'}
+                                  </button>
                                   <button
                                     onClick={() => {
-                                      setRejectingOrderId(order.id!);
+                                      setEditingProductId(prod.id);
+                                      setEditStock(String(prod.stock));
+                                      setEditPrice(String(prod.price));
+                                      setEditDiscount(String(prod.discount || ''));
+                                      setEditFestivalName(prod.festiveName || '');
+                                      setEditDeliveryCharge(String(prod.deliveryCharge || 0));
+                                      setEditSafetyFee(String(prod.safetyFee || 0));
+                                      setEditIsActive(prod.isActive !== false);
+                                      setEditProductImage(prod.imageUrl || '');
+                                      setProductSizesInput(prod.sizes || []);
+                                    }}
+                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded font-semibold"
+                                  >
+                                    Edit details
+                                  </button>
+                                  <button
+                                    onClick={() => setProductToDeleteId(prod.id)}
+                                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ORDERS TAB */}
+                  {adminActiveTab === 'orders' && (
+                    <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-rose-50 pb-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-lg text-slate-805">Orders Log</h3>
+                          {unreadOrdersCount > 0 && (
+                            <span className="bg-rose-100 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">
+                              {unreadOrdersCount} New
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {unreadOrdersCount > 0 && (
+                            <button
+                              onClick={handleMarkAllOrdersRead}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-1 px-3 rounded-lg text-xs transition-colors border border-rose-200"
+                            >
+                              Mark all as read
+                            </button>
+                          )}
+                          {pendingOrders.length > 0 && (
+                            <button
+                              onClick={handleSyncOrders}
+                              className="bg-emerald-600 hover:bg-emerald-550 text-white font-semibold py-1 px-3 rounded-lg text-xs transition-colors"
+                            >
+                              Sync Offline Orders ({pendingOrders.length})
+                            </button>
+                          )}
+                          <button
+                            onClick={handleRefreshOrders}
+                            disabled={!isOnline || isLoading}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg text-xs transition-colors border border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isLoading ? 'Refreshing...' : '↻ Refresh Orders'}
+                          </button>
+                        </div>
+                      </div>
+                      {allOrders.length === 0 ? (
+                        <p className="text-slate-405 text-sm">No orders registered on this device.</p>
+                      ) : (
+                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                          {allOrders.map((order) => (
+                            <div
+                              key={order.id}
+                              className={`p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm relative border ${!readOrderIds.includes(String(order.id))
+                                ? 'border-rose-300 bg-rose-50/50 shadow-md shadow-rose-100/50 ring-1 ring-rose-200'
+                                : 'border-rose-100 bg-rose-50/30'
+                                }`}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start border-b border-rose-100/50 pb-2 gap-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                  <span className="font-bold text-slate-800 font-mono text-xs sm:text-sm">Order #{order.receiptId || `KRP-${order.id}`}</span>
+                                  <span className="text-slate-400 text-[10px] sm:text-xs">
+                                    {moment(order.createdAt).format('D MMMM YYYY hh:mm A')}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => {
+                                      setActiveReceiptOrder(order);
                                       if (!readOrderIds.includes(String(order.id))) {
                                         const updated = [...readOrderIds, String(order.id)];
                                         setReadOrderIds(updated);
                                         localStorage.setItem('admin_read_order_ids', JSON.stringify(updated));
                                       }
                                     }}
-                                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-200 transition-colors"
+                                    className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-250 transition-colors"
                                   >
-                                    Reject
+                                    View / Print Bill
                                   </button>
-                                )}
-                                <span
-                                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                                    order.status === 'synced'
+                                  {order.status !== 'rejected' && order.status !== 'cancelled' && (
+                                    <button
+                                      onClick={() => {
+                                        setRejectingOrderId(order.id!);
+                                        if (!readOrderIds.includes(String(order.id))) {
+                                          const updated = [...readOrderIds, String(order.id)];
+                                          setReadOrderIds(updated);
+                                          localStorage.setItem('admin_read_order_ids', JSON.stringify(updated));
+                                        }
+                                      }}
+                                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-200 transition-colors"
+                                    >
+                                      Reject
+                                    </button>
+                                  )}
+                                  <span
+                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.status === 'synced'
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                       : order.status === 'rejected'
-                                      ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                      : order.status === 'cancelled'
-                                      ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                                  }`}
-                                >
-                                  {order.status === 'synced' ? 'Synced' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled by Customer' : 'Pending Sync'}
-                                </span>
+                                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                        : order.status === 'cancelled'
+                                          ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                                      }`}
+                                  >
+                                    {order.status === 'synced' ? 'Synced' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled by Customer' : 'Pending Sync'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {order.shippingInfo && (
+                                <div className="bg-white p-3 rounded-xl border border-rose-100/80 space-y-1 text-slate-600 text-xs shadow-inner">
+                                  <div className="font-bold text-slate-700 mb-1">Customer & Delivery Info:</div>
+                                  <div><strong>Name:</strong> {order.shippingInfo.fullName}</div>
+                                  <div><strong>Phone:</strong> {order.shippingInfo.phone}</div>
+                                  <div><strong>Address:</strong> {order.shippingInfo.address}, {order.shippingInfo.city}, {order.shippingInfo.state}, {order.shippingInfo.country} - {order.shippingInfo.pincode}</div>
+                                </div>
+                              )}
+
+                              {order.status === 'rejected' && order.rejectionReason && (
+                                <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-850">
+                                  <strong>⚠️ Rejection Reason:</strong> {order.rejectionReason}
+                                </div>
+                              )}
+
+                              {order.status === 'cancelled' && (
+                                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-700">
+                                  <strong>🚫 Customer Cancellation Reason:</strong> {order.cancellationReason || 'No reason provided by customer.'}
+                                </div>
+                              )}
+
+                              {order.summary && (
+                                <div className="bg-rose-50/20 p-3 rounded-xl border border-rose-100/40 text-xs space-y-1 text-slate-550">
+                                  <div className="font-bold text-slate-605 mb-1">Cost Breakdown:</div>
+                                  <div className="flex justify-between">
+                                    <span>Subtotal:</span>
+                                    <span>₹{order.summary.subtotal.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-emerald-600">
+                                    <span>Discount Saved:</span>
+                                    <span>-₹{order.summary.discountSaved.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>CGST/SGST Taxes:</span>
+                                    <span>₹{(order.summary.cgst + order.summary.sgst).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Extra Fees (Delivery, Pkg, Safety):</span>
+                                    <span>₹{(order.summary.delivery + order.summary.packaging + order.summary.safety).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Item list details */}
+                              <div className="bg-rose-50/30 border border-rose-100/60 p-3 rounded-xl text-xs space-y-1.5 text-slate-700 shadow-sm">
+                                <div className="font-bold text-slate-800 border-b border-rose-100/50 pb-1 mb-1.5">Purchased Products:</div>
+                                {order.items.map((item, idx) => {
+                                  const prod = products.find(p => p.id === item.productId);
+                                  return (
+                                    <div key={idx} className="flex justify-between items-start gap-2">
+                                      <div className="min-w-0">
+                                        <div className="font-medium text-slate-850 truncate">{prod ? prod.name : 'Unknown Product'}</div>
+                                        {item.selectedSize && (
+                                          <div className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                                            📏 Size: {item.selectedSize.size} ({item.selectedSize.length})
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="shrink-0 text-slate-500 font-mono text-[11px]">
+                                        {item.quantity}x • ₹{item.priceAtPurchase.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="flex justify-between items-center text-xs text-slate-555 font-medium">
+                                <span>{order.items.reduce((acc, i) => acc + i.quantity, 0)} items purchased</span>
+                                <span>Total: <strong className="font-bold text-rose-600 text-sm">₹{order.totalAmount.toFixed(2)}</strong></span>
                               </div>
                             </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                            {order.shippingInfo && (
-                              <div className="bg-white p-3 rounded-xl border border-rose-100/80 space-y-1 text-slate-600 text-xs shadow-inner">
-                                <div className="font-bold text-slate-700 mb-1">Customer & Delivery Info:</div>
-                                <div><strong>Name:</strong> {order.shippingInfo.fullName}</div>
-                                <div><strong>Phone:</strong> {order.shippingInfo.phone}</div>
-                                <div><strong>Address:</strong> {order.shippingInfo.address}, {order.shippingInfo.city}, {order.shippingInfo.state}, {order.shippingInfo.country} - {order.shippingInfo.pincode}</div>
+                  {/* ANNOUNCEMENTS & LIVE TAB */}
+                  {adminActiveTab === 'announcements' && (
+                    <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4 max-w-xl">
+                      <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">Banners & Announcements</h3>
+                      <form onSubmit={handleSaveAnnouncement} className="space-y-4 text-xs">
+                        <div>
+                          <label className="block text-slate-655 font-bold mb-1">Announcement Ticker Content</label>
+                          <textarea
+                            value={announcementContent}
+                            onChange={(e) => setAnnouncementContent(e.target.value)}
+                            placeholder="Type homepage marquee notice here..."
+                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 h-20 text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-655 font-bold mb-1">Active Facebook Live Stream URL</label>
+                          <input
+                            type="url"
+                            value={facebookLiveUrl}
+                            onChange={(e) => setFacebookLiveUrl(e.target.value)}
+                            placeholder="https://facebook.com/watch/live/..."
+                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-800"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 px-4 rounded-lg shadow-sm"
+                        >
+                          Update Announcement & Live Stream Banner
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* EVENTS SCHEDULER TAB */}
+                  {adminActiveTab === 'events' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-1">
+                        <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                          <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">Schedule Upcoming Event</h3>
+                          <form onSubmit={handleAddEvent} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-600 mb-1">Event Title *</label>
+                              <input
+                                type="text"
+                                required
+                                value={eventTitle}
+                                onChange={(e) => setEventTitle(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 text-slate-800"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-600 mb-1">Event Type</label>
+                              <select
+                                value={eventType}
+                                onChange={(e) => setEventType(e.target.value as any)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 text-slate-800"
+                              >
+                                <option value="live">Live Show Link</option>
+                                <option value="exhibition">Exhibition Pop-Up</option>
+                                <option value="product_launch">Product Launch</option>
+                                <option value="biggest_offer">Biggest Offer</option>
+                                <option value="other">Other Boutique Event</option>
+                              </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-slate-600 mb-1">Start Date *</label>
+                                <input
+                                  type="date"
+                                  required
+                                  value={eventDate}
+                                  onChange={(e) => setEventDate(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 text-slate-800 text-xs"
+                                />
                               </div>
-                            )}
-
-                            {order.status === 'rejected' && order.rejectionReason && (
-                              <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-850">
-                                <strong>⚠️ Rejection Reason:</strong> {order.rejectionReason}
+                              <div>
+                                <label className="block text-slate-600 mb-1">End Date</label>
+                                <input
+                                  type="date"
+                                  value={eventEndDate}
+                                  onChange={(e) => setEventEndDate(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 text-slate-800 text-xs"
+                                />
                               </div>
-                            )}
+                            </div>
+                            <div>
+                              <label className="block text-slate-600 mb-1">Description / Location Info</label>
+                              <textarea
+                                value={eventDescription}
+                                onChange={(e) => setEventDescription(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 h-16 text-slate-800"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-600 mb-1">Link URL (Optional)</label>
+                              <input
+                                type="url"
+                                value={eventLink}
+                                onChange={(e) => setEventLink(e.target.value)}
+                                placeholder="https://..."
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 text-slate-800"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              {editingEventId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingEventId(null);
+                                    setEventTitle('');
+                                    setEventDate('');
+                                    setEventEndDate('');
+                                    setEventDescription('');
+                                    setEventLink('');
+                                  }}
+                                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg transition-colors shadow-sm"
+                                >
+                                  Cancel Edit
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className={`font-bold py-2 rounded-lg transition-colors shadow-sm text-white ${
+                                  editingEventId ? 'w-1/2 bg-amber-600 hover:bg-amber-550' : 'w-full bg-rose-600 hover:bg-rose-550'
+                                }`}
+                              >
+                                {editingEventId ? 'Save Changes' : 'Create Event'}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                      <div className="lg:col-span-2">
+                        <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                          <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">Active Scheduled Timelines</h3>
+                          {eventsList.length === 0 ? (
+                            <p className="text-slate-400 text-xs">No upcoming events scheduled.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {eventsList.map((ev) => (
+                                <div key={ev.id} className="bg-rose-50/20 border border-rose-100/60 p-4 rounded-xl flex items-start justify-between gap-4 text-xs shadow-inner">
+                                  <div>
+                                    <span className="inline-block text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 tracking-wider">
+                                      {ev.type}
+                                    </span>
+                                    <h4 className="font-bold text-slate-800 mt-1">{ev.title}</h4>
+                                    <div className="text-slate-450 mt-0.5">
+                                      Date: {ev.eventDate} {ev.eventEndDate && `to ${ev.eventEndDate}`}
+                                    </div>
+                                    <p className="text-slate-500 mt-1 leading-relaxed">{ev.description}</p>
+                                  </div>
+                                  <div className="flex flex-col gap-1.5 shrink-0">
+                                    <button
+                                      onClick={() => {
+                                        setEditingEventId(ev.id);
+                                        setEventTitle(ev.title);
+                                        setEventType(ev.type);
+                                        setEventDate(ev.eventDate);
+                                        setEventEndDate(ev.eventEndDate || '');
+                                        setEventDescription(ev.description);
+                                        setEventLink(ev.linkUrl || '');
+                                      }}
+                                      className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded font-semibold text-center"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEvent(ev.id)}
+                                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold text-center"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                            {order.status === 'cancelled' && (
-                              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-700">
-                                <strong>🚫 Customer Cancellation Reason:</strong> {order.cancellationReason || 'No reason provided by customer.'}
+                  {/* TAXES & GLOBAL SETTINGS TAB */}
+                  {adminActiveTab === 'settings' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Fee & Tax configuration panel */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-850">Taxes & Packaging Configuration</h3>
+                        <form onSubmit={handleSaveSettings} className="space-y-3 text-xs">
+                          {/* GST Toggle Switch */}
+                          <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60 mb-2">
+                            <input
+                              type="checkbox"
+                              id="gstToggle"
+                              checked={gstEnabled}
+                              onChange={(e) => setGstEnabled(e.target.checked)}
+                              className="accent-rose-650 cursor-pointer h-4 w-4"
+                            />
+                            <label htmlFor="gstToggle" className="text-slate-700 font-bold cursor-pointer">
+                              Enable GST & CGST Taxes
+                            </label>
+                          </div>
+
+                          {gstEnabled && (
+                            <div className="grid grid-cols-2 gap-2.5 animate-in fade-in duration-150">
+                              <div>
+                                <label className="block text-slate-500 mb-1">CGST (%)</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={cgstRate}
+                                  onChange={(e) => setCgstRate(parseFloat(e.target.value) || 0)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                                />
                               </div>
-                            )}
-
-                            {order.summary && (
-                              <div className="bg-rose-50/20 p-3 rounded-xl border border-rose-100/40 text-xs space-y-1 text-slate-550">
-                                <div className="font-bold text-slate-605 mb-1">Cost Breakdown:</div>
-                                <div className="flex justify-between">
-                                  <span>Subtotal:</span>
-                                  <span>₹{order.summary.subtotal.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-emerald-600">
-                                  <span>Discount Saved:</span>
-                                  <span>-₹{order.summary.discountSaved.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>CGST/SGST Taxes:</span>
-                                  <span>₹{(order.summary.cgst + order.summary.sgst).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Extra Fees (Delivery, Pkg, Safety):</span>
-                                  <span>₹{(order.summary.delivery + order.summary.packaging + order.summary.safety).toFixed(2)}</span>
-                                </div>
+                              <div>
+                                <label className="block text-slate-500 mb-1">SGST (%)</label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={sgstRate}
+                                  onChange={(e) => setSgstRate(parseFloat(e.target.value) || 0)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                                />
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            <div className="flex justify-between items-center text-xs text-slate-555 font-medium">
-                              <span>{order.items.reduce((acc, i) => acc + i.quantity, 0)} items purchased</span>
-                              <span>Total: <strong className="font-bold text-rose-600 text-sm">₹{order.totalAmount.toFixed(2)}</strong></span>
+                          <div>
+                            <label className="block text-slate-500 mb-1">Packaging Fee (₹)</label>
+                            <input
+                              type="number"
+                              value={packagingFee}
+                              onChange={(e) => setPackagingFee(parseFloat(e.target.value) || 0)}
+                              className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                            />
+                          </div>
+
+                          {/* Seller Info Toggle Switch */}
+                          <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60 mb-2">
+                            <input
+                              type="checkbox"
+                              id="sellerToggle"
+                              checked={sellerInfoEnabled}
+                              onChange={(e) => setSellerInfoEnabled(e.target.checked)}
+                              className="accent-rose-650 cursor-pointer h-4 w-4"
+                            />
+                            <label htmlFor="sellerToggle" className="text-slate-700 font-bold cursor-pointer">
+                              Show Seller Contact Details
+                            </label>
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-[11px]"
+                          >
+                            Save Configurations
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Cloud Sync Connector configuration */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-850">Cloud Sync Connector (Supabase)</h3>
+                        <form onSubmit={async (e) => {
+                          e.preventDefault();
+                          localStorage.setItem('supabase_url', supabaseUrl.trim());
+                          localStorage.setItem('supabase_key', supabaseKey.trim());
+                          showToast('Supabase Cloud credentials updated!', 'success');
+                          if (supabaseUrl.trim() && supabaseKey.trim()) {
+                            setIsLoading(true);
+                            try {
+                              const count = await pullProductsFromCloud();
+                              showToast(`Initial sync completed: loaded ${count} products!`, 'success');
+                            } catch (err: any) {
+                              console.error('Cloud sync failed:', err);
+                              showToast(`Sync failed: ${err.message || 'Check URL and Key.'}`, 'error');
+                            } finally {
+                              setIsLoading(false);
+                            }
+                          }
+                        }} className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-slate-500 mb-1">Supabase Project URL</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="https://xxxx.supabase.co"
+                              value={supabaseUrl}
+                              onChange={(e) => setSupabaseUrl(e.target.value)}
+                              className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 mb-1">Supabase Anon Key</label>
+                            <input
+                              type="password"
+                              required
+                              placeholder="eyJhbGciOi..."
+                              value={supabaseKey}
+                              onChange={(e) => setSupabaseKey(e.target.value)}
+                              className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
+                          >
+                            Save & Connect
+                          </button>
+                        </form>
+                        <div className="space-y-3">
+                          <div className={`text-[10px] font-bold p-2.5 rounded-lg text-center border ${isCloudConfigured()
+                            ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
+                            : 'text-amber-600 bg-amber-50 border-amber-100'
+                            }`}>
+                            {isCloudConfigured() ? 'Connected to Cloud Database' : 'Running in Local-Only Mode'}
+                          </div>
+                          <div className="bg-rose-50/50 border border-rose-100 p-3 rounded-xl text-[10px] space-y-2 text-slate-700 font-medium">
+                            <div className="font-bold text-rose-700 uppercase tracking-widest text-[9px] mb-1">Active Credentials:</div>
+                            <div className="flex items-center justify-between gap-2 border-b border-rose-100/50 pb-1.5">
+                              <span className="truncate">URL: <strong>{supabaseUrl || '(Not Set)'}</strong></span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (supabaseUrl) {
+                                    navigator.clipboard.writeText(supabaseUrl);
+                                    showToast('Project URL copied to clipboard!', 'success');
+                                  }
+                                }}
+                                disabled={!supabaseUrl}
+                                className="text-[9px] bg-rose-100 hover:bg-rose-200 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate">Key: <strong>{supabaseKey ? `${supabaseKey.substring(0, 15)}...` : '(Not Set)'}</strong></span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (supabaseKey) {
+                                    navigator.clipboard.writeText(supabaseKey);
+                                    showToast('Anon Key copied to clipboard!', 'success');
+                                  }
+                                }}
+                                disabled={!supabaseKey}
+                                className="text-[9px] bg-rose-100 hover:bg-rose-200 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-bold px-2 py-0.5 rounded border border-rose-200 cursor-pointer shrink-0"
+                              >
+                                Copy
+                              </button>
                             </div>
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )}
 
+                </div>
               </div>
             )}
           </div>
@@ -2463,45 +3084,33 @@ export default function App() {
             <p className="text-xs text-slate-505 mb-5">Scan this QR code using any UPI application to complete payment.</p>
 
             <div className="my-5">
-              <svg className="w-48 h-48 mx-auto border-2 border-rose-100 p-2.5 rounded-2xl bg-white shadow-sm" viewBox="0 0 100 100">
-                <rect width="100" height="100" fill="#fff" />
-                <rect x="5" y="5" width="20" height="20" fill="#e11d48" />
-                <rect x="8" y="8" width="14" height="14" fill="#fff" />
-                <rect x="11" y="11" width="8" height="8" fill="#e11d48" />
-
-                <rect x="75" y="5" width="20" height="20" fill="#e11d48" />
-                <rect x="78" y="8" width="14" height="14" fill="#fff" />
-                <rect x="81" y="11" width="8" height="8" fill="#e11d48" />
-
-                <rect x="5" y="75" width="20" height="20" fill="#e11d48" />
-                <rect x="8" y="78" width="14" height="14" fill="#fff" />
-                <rect x="11" y="81" width="8" height="8" fill="#e11d48" />
-
-                <rect x="75" y="75" width="20" height="20" fill="#e11d48" />
-                <rect x="78" y="78" width="14" height="14" fill="#fff" />
-                <rect x="81" y="81" width="8" height="8" fill="#e11d48" />
-
-                <rect x="35" y="15" width="8" height="8" fill="#1e293b" />
-                <rect x="50" y="25" width="12" height="6" fill="#1e293b" />
-                <rect x="35" y="45" width="10" height="10" fill="#1e293b" />
-                <rect x="55" y="45" width="15" height="5" fill="#1e293b" />
-                <rect x="40" y="70" width="8" height="15" fill="#1e293b" />
-                <rect x="60" y="70" width="10" height="10" fill="#1e293b" />
-
-                <circle cx="50" cy="50" r="10" fill="#e11d48" />
-                <text x="50" y="53" fontSize="8" fontWeight="bold" fill="#fff" textAnchor="middle">KRP</text>
-              </svg>
+              {/* Clickable QR Code scanner targeting direct payment app redirects */}
+              <a 
+                href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL&am=${cartGrandTotal.toFixed(2)}&tn=KRP%20Creation%20Order&cu=INR`}
+                title="Pay with UPI App"
+                className="block hover:opacity-95 transition-opacity"
+              >
+                <img 
+                  src="https://ggbevhaudwhbpevjbdhq.supabase.co/storage/v1/object/public/assets/qr_phonepe.jpg" 
+                  alt="Scan to Pay PhonePe" 
+                  className="w-48 h-auto mx-auto border-2 border-rose-100 p-1 rounded-2xl bg-white shadow-sm cursor-pointer"
+                />
+              </a>
             </div>
 
-            <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl mb-4 text-xs space-y-1">
-              <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold">Payment Details</div>
-              <div className="text-xs font-bold text-slate-700 select-all">UPI ID: payment@krpcreation</div>
+            {/* Clickable UPI link details */}
+            <a 
+              href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL&am=${cartGrandTotal.toFixed(2)}&tn=KRP%20Creation%20Order&cu=INR`}
+              className="block bg-rose-50 hover:bg-rose-100/80 border border-rose-100 p-3 rounded-xl mb-4 text-xs space-y-1 transition-colors cursor-pointer text-left"
+            >
+              <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold text-center">Payment Details (Click to Pay)</div>
+              <div className="text-xs font-bold text-slate-705 text-center truncate">UPI ID: <span className="text-rose-650 underline">7890784816-3@ybl</span></div>
               {sellerInfoEnabled && (
-                <div className="text-[10px] text-slate-500 border-t border-rose-100/40 pt-1 mt-1 font-medium">
+                <div className="text-[10px] text-slate-500 border-t border-rose-100/40 pt-1 mt-1 font-medium text-center">
                   Seller: <strong>Ranu Das Pal</strong> (7890784816)
                 </div>
               )}
-            </div>
+            </a>
 
             <div className="flex justify-between items-center text-sm font-bold mb-5 px-1 text-slate-700">
               <span>Amount to Pay:</span>
@@ -2726,7 +3335,7 @@ export default function App() {
                   </div>
 
                   {/* Extra charges */}
-                  <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] text-slate-505 space-y-0.5">
+                  <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-lg text-[11px] text-slate-550 space-y-0.5">
                     <div className="flex justify-between">
                       <span>Delivery Charge:</span>
                       <span className="font-bold text-slate-700">₹{selectedProduct.deliveryCharge || 0}</span>
@@ -2736,6 +3345,31 @@ export default function App() {
                       <span className="font-bold text-slate-700">₹{selectedProduct.safetyFee || 0}</span>
                     </div>
                   </div>
+
+                  {/* Size Dropdown Selector */}
+                  {selectedProduct.sizes && selectedProduct.sizes.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-slate-700">Select Available Size & Length:</label>
+                      <select
+                        value={selectedUserSize ? JSON.stringify(selectedUserSize) : ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setSelectedUserSize(JSON.parse(e.target.value));
+                          } else {
+                            setSelectedUserSize(null);
+                          }
+                        }}
+                        className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:border-rose-455 font-semibold"
+                      >
+                        <option value="">-- Choose Size --</option>
+                        {selectedProduct.sizes.map((sz, idx) => (
+                          <option key={idx} value={JSON.stringify(sz)}>
+                            {sz.size} (Length: {sz.length})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2833,11 +3467,24 @@ export default function App() {
             <div className="bg-rose-50/50 p-4 border-t border-rose-100 flex items-center justify-between shrink-0">
               <span className="text-xs text-slate-450">Base Price: ₹{selectedProduct.price.toFixed(2)}</span>
               <button
-                onClick={() => {
-                  handleAddToCart(selectedProduct);
-                  setSelectedProduct(null);
-                  setReviewComment('');
-                  setReviewRating(5);
+                onClick={async () => {
+                  if (selectedProduct.sizes && selectedProduct.sizes.length > 0 && !selectedUserSize) {
+                    showToast('Please select a size and length before adding to cart.', 'error');
+                    return;
+                  }
+                  setIsLoading(true);
+                  try {
+                    await addToCart(selectedProduct.id, selectedUserSize || undefined);
+                    showToast(`${selectedProduct.name} added to cart successfully!`, 'success');
+                    setSelectedProduct(null);
+                    setSelectedUserSize(null);
+                    setReviewComment('');
+                    setReviewRating(5);
+                  } catch (err) {
+                    showToast('Failed to add item to cart.', 'error');
+                  } finally {
+                    setIsLoading(false);
+                  }
                 }}
                 disabled={selectedProduct.stock <= 0}
                 className={`font-bold py-2 px-6 rounded-lg transition-colors text-xs shadow-md ${selectedProduct.stock <= 0
@@ -2999,6 +3646,54 @@ export default function App() {
                       onChange={(e) => setEditProductImage(e.target.value)}
                       className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* Product Sizes Creator section inside edit form */}
+                <div className="space-y-2 border-t border-rose-100 pt-3.5 mt-2">
+                  <label className="block text-xs font-bold text-slate-700">Add / Edit Product Sizes & Lengths *</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. S, M, L"
+                      value={newSizeName}
+                      onChange={(e) => setNewSizeName(e.target.value.toUpperCase())}
+                      className="w-1/2 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="e.g. 36 inches"
+                      value={newSizeLength}
+                      onChange={(e) => setNewSizeLength(e.target.value)}
+                      className="w-1/2 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newSizeName.trim()) return;
+                        setProductSizesInput(prev => [...prev, { size: newSizeName.trim(), length: newSizeLength.trim() || 'N/A' }]);
+                        setNewSizeName('');
+                        setNewSizeLength('');
+                      }}
+                      className="bg-rose-600 hover:bg-rose-550 text-white font-bold text-xs px-3 rounded-lg"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1.5">
+                    {productSizesInput.map((sz, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-150 rounded-full px-2.5 py-0.5 text-xs text-rose-800 font-medium">
+                        {sz.size} ({sz.length})
+                        <button
+                          type="button"
+                          onClick={() => setProductSizesInput(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-rose-400 hover:text-rose-600 font-bold"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
                   </div>
                 </div>
 

@@ -8,6 +8,11 @@ export interface User {
   createdAt: number;
 }
 
+export interface ProductSize {
+  size: string; // e.g. "S", "M", "L", "XL", "Free Size"
+  length: string; // e.g. "38 inches", "42 inches", "N/A"
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -23,12 +28,14 @@ export interface Product {
   safetyFee?: number; // Product-specific safety fee
   isActive?: boolean; // Active/Inactive toggle
   reviews?: Array<{ reviewerName: string; rating: number; comment: string; createdAt: number }>;
+  sizes?: ProductSize[]; // List of available sizes and their lengths
 }
 
 export interface CartItem {
   id?: number;
   productId: string;
   quantity: number;
+  selectedSize?: ProductSize; // Size selected by user
 }
 
 export interface Order {
@@ -37,6 +44,7 @@ export interface Order {
     productId: string;
     quantity: number;
     priceAtPurchase: number;
+    selectedSize?: ProductSize; // Size selected at purchase
   }[];
   totalAmount: number;
   status: 'pending_sync' | 'synced' | 'rejected' | 'cancelled';
@@ -64,11 +72,31 @@ export interface Order {
   receiptId?: string; // KRP-{{random12digitnumber}}
 }
 
+export interface Announcement {
+  id: string; // 'global' or unique id
+  content: string;
+  liveUrl?: string; // Facebook Live link
+  updatedAt: number;
+}
+
+export interface EventItem {
+  id: string;
+  title: string;
+  type: 'live' | 'exhibition' | 'product_launch' | 'biggest_offer' | 'other';
+  eventDate: string;
+  eventEndDate?: string; // Scheduled End Date
+  description: string;
+  linkUrl?: string;
+  createdAt: number;
+}
+
 class OfflineEcommerceDB extends Dexie {
   users!: Table<User, number>;
   products!: Table<Product, string>;
   cart!: Table<CartItem, number>;
   orders!: Table<Order, number>;
+  announcements!: Table<Announcement, string>;
+  events!: Table<EventItem, string>;
 
   constructor() {
     super('OfflineEcommerceDB');
@@ -77,6 +105,16 @@ class OfflineEcommerceDB extends Dexie {
       products: 'id, category',
       cart: '++id, productId',
       orders: '++id, status, receiptId'
+    });
+
+    // Version 3: Add announcements and events tables for local persist & sync
+    this.version(3).stores({
+      users: '++id, &phone',
+      products: 'id, category',
+      cart: '++id, productId',
+      orders: '++id, status, receiptId',
+      announcements: 'id',
+      events: 'id, eventDate'
     });
   }
 }

@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, type CartItem } from '../db/db';
+import { db, type CartItem, type ProductSize } from '../db/db';
 
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (productId: string) => Promise<void>;
-  removeFromCart: (productId: string) => Promise<void>;
-  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  addToCart: (productId: string, selectedSize?: ProductSize) => Promise<void>;
+  removeFromCart: (productId: string, selectedSize?: ProductSize) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number, selectedSize?: ProductSize) => Promise<void>;
   clearCart: () => Promise<void>;
 }
 
@@ -23,31 +23,44 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadCart();
   }, []);
 
-  const addToCart = async (productId: string) => {
-    const existing = await db.cart.where('productId').equals(productId).first();
-    if (existing) {
-      await db.cart.update(existing.id!, { quantity: existing.quantity + 1 });
+  const addToCart = async (productId: string, selectedSize?: ProductSize) => {
+    const existing = await db.cart.toArray();
+    const match = existing.find(item => 
+      item.productId === productId && 
+      (!selectedSize || (item.selectedSize && item.selectedSize.size === selectedSize.size))
+    );
+
+    if (match) {
+      await db.cart.update(match.id!, { quantity: match.quantity + 1 });
     } else {
-      await db.cart.add({ productId, quantity: 1 });
+      await db.cart.add({ productId, quantity: 1, selectedSize });
     }
     await loadCart();
   };
 
-  const removeFromCart = async (productId: string) => {
-    const existing = await db.cart.where('productId').equals(productId).first();
-    if (existing) {
-      await db.cart.delete(existing.id!);
+  const removeFromCart = async (productId: string, selectedSize?: ProductSize) => {
+    const existing = await db.cart.toArray();
+    const match = existing.find(item => 
+      item.productId === productId && 
+      (!selectedSize || (item.selectedSize && item.selectedSize.size === selectedSize.size))
+    );
+    if (match) {
+      await db.cart.delete(match.id!);
     }
     await loadCart();
   };
 
-  const updateQuantity = async (productId: string, quantity: number) => {
-    const existing = await db.cart.where('productId').equals(productId).first();
-    if (existing) {
+  const updateQuantity = async (productId: string, quantity: number, selectedSize?: ProductSize) => {
+    const existing = await db.cart.toArray();
+    const match = existing.find(item => 
+      item.productId === productId && 
+      (!selectedSize || (item.selectedSize && item.selectedSize.size === selectedSize.size))
+    );
+    if (match) {
       if (quantity <= 0) {
-        await db.cart.delete(existing.id!);
+        await db.cart.delete(match.id!);
       } else {
-        await db.cart.update(existing.id!, { quantity });
+        await db.cart.update(match.id!, { quantity });
       }
     }
     await loadCart();
