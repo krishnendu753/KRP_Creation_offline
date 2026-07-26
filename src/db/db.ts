@@ -39,8 +39,9 @@ export interface Order {
     priceAtPurchase: number;
   }[];
   totalAmount: number;
-  status: 'pending_sync' | 'synced' | 'rejected';
+  status: 'pending_sync' | 'synced' | 'rejected' | 'cancelled';
   rejectionReason?: string;
+  cancellationReason?: string;
   shippingInfo: {
     fullName: string;
     phone: string;

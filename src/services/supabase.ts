@@ -121,6 +121,7 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
     summary: order.summary,
     status: order.status,
     rejection_reason: order.rejectionReason || null,
+    cancellation_reason: order.cancellationReason || null,
     created_at: new Date(order.createdAt).toISOString()
   }));
 
@@ -163,15 +164,17 @@ export const pullOrdersFromCloud = async (): Promise<number> => {
         summary: item.summary,
         status: item.status || 'synced',
         rejectionReason: item.rejection_reason || undefined,
+        cancellationReason: item.cancellation_reason || undefined,
         createdAt: new Date(item.created_at).getTime()
       };
 
       const existingLocalId = localByReceiptId.get(cloudReceiptId);
       if (existingLocalId !== undefined) {
-        // Update status/rejection on existing local record
+        // Update status/rejection/cancellation on existing local record
         await db.orders.update(existingLocalId, {
           status: orderPayload.status,
           rejectionReason: orderPayload.rejectionReason,
+          cancellationReason: orderPayload.cancellationReason,
         });
       } else {
         // Insert as new local order

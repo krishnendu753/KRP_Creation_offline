@@ -130,6 +130,8 @@ export default function App() {
   const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI');
   const [rejectingOrderId, setRejectingOrderId] = useState<number | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const [cancellationReasonText, setCancellationReasonText] = useState('');
   const [readOrderIds, setReadOrderIds] = useState<string[]>(() => JSON.parse(localStorage.getItem('admin_read_order_ids') || '[]'));
 
   // Review states for customers
@@ -320,6 +322,7 @@ export default function App() {
               await db.orders.update(existing.id, {
                 status: item.status || 'synced',
                 rejectionReason: item.rejection_reason || undefined,
+                cancellationReason: item.cancellation_reason || undefined,
               });
             } else if (!existing) {
               // New order we don't have locally yet — add it
@@ -331,15 +334,24 @@ export default function App() {
                 summary: item.summary,
                 status: item.status || 'synced',
                 rejectionReason: item.rejection_reason || undefined,
+                cancellationReason: item.cancellation_reason || undefined,
                 createdAt: new Date(item.created_at).getTime()
               });
             }
 
-            // Alert customer in real-time if their order has been rejected
             const localUserPhone = localStorage.getItem('auth_user_phone') || '';
+            const ADMIN_PHONES_LIST = ['7890784816', '7059782504'];
+            const userIsAdmin = !!localUserPhone && ADMIN_PHONES_LIST.includes(localUserPhone);
             const isCustomerOrder = item.shipping_info?.phone === localUserPhone;
+
+            // Alert customer in real-time if their order has been rejected
             if (isCustomerOrder && item.status === 'rejected') {
               showToast(`⚠️ Order #${item.receipt_id} has been Rejected. Remarks: ${item.rejection_reason || 'No remarks note provided.'}`, 'error');
+            }
+
+            // Alert admin in real-time if a customer cancelled an order
+            if (userIsAdmin && item.status === 'cancelled') {
+              showToast(`🚫 Order #${item.receipt_id} was Cancelled by Customer. Reason: ${item.cancellation_reason || 'No reason provided.'}`, 'info');
             }
           })
           .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, async (payload) => {
@@ -790,6 +802,39 @@ export default function App() {
     }
   };
 
+  // Customer Cancel Order handler
+  const handleCancelOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancellingOrderId) return;
+    if (!cancellationReasonText.trim()) {
+      showToast('Please provide a reason for cancellation.', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await db.orders.update(cancellingOrderId, {
+        status: 'cancelled',
+        cancellationReason: cancellationReasonText.trim()
+      });
+
+      if (isOnline && isCloudConfigured()) {
+        const orderObj = await db.orders.get(cancellingOrderId);
+        if (orderObj) {
+          await syncOrdersToCloud([orderObj]);
+        }
+      }
+
+      showToast('Your order has been cancelled successfully.', 'success');
+      setCancellingOrderId(null);
+      setCancellationReasonText('');
+    } catch (err) {
+      showToast('Failed to cancel the order. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Customer submit review helper
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -911,6 +956,28 @@ export default function App() {
     localStorage.setItem('admin_read_order_ids', JSON.stringify(allIds));
     setReadOrderIds(allIds);
     showToast('All new order notifications marked as read.', 'success');
+  };
+
+  // Admin: Manually refresh/pull all orders from Supabase cloud
+  const handleRefreshOrders = async () => {
+    if (!isOnline) {
+      showToast('You must be online to refresh orders.', 'error');
+      return;
+    }
+    if (!isCloudConfigured()) {
+      showToast('Cloud database is not configured.', 'error');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const count = await pullOrdersFromCloud();
+      showToast(`Orders refreshed. ${count} total record(s) pulled from cloud.`, 'success');
+    } catch (err: any) {
+      console.error('Order refresh failed:', err);
+      showToast(`Failed to refresh orders: ${err.message || 'Unknown error'}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Countries options list
@@ -1474,23 +1541,34 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => setActiveReceiptOrder(order)}
                           className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-rose-200 transition-colors"
                         >
                           View / Print Receipt Bill
                         </button>
+                        {/* Cancel button: only for synced orders not yet cancelled/rejected */}
+                        {(order.status === 'synced' || order.status === 'pending_sync') && (
+                          <button
+                            onClick={() => setCancellingOrderId(order.id!)}
+                            className="bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-slate-200 transition-colors"
+                          >
+                            Cancel Order
+                          </button>
+                        )}
                         <span
                           className={`text-xs px-3.5 py-1 rounded-full font-bold border ${
                             order.status === 'synced'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                               : order.status === 'rejected'
                               ? 'bg-rose-50 text-rose-750 border-rose-200'
+                              : order.status === 'cancelled'
+                              ? 'bg-slate-100 text-slate-600 border-slate-300'
                               : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}
                         >
-                          {order.status === 'synced' ? 'Placed Online' : order.status === 'rejected' ? 'Rejected' : 'Queued Offline'}
+                          {order.status === 'synced' ? 'Placed Online' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled' : 'Queued Offline'}
                         </span>
                       </div>
                     </div>
@@ -1543,7 +1621,13 @@ export default function App() {
 
                       {order.status === 'rejected' && order.rejectionReason && (
                         <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-800 font-medium">
-                          <strong>Remarks Note / Reason:</strong> {order.rejectionReason}
+                          <strong>⚠️ Rejection Remark:</strong> {order.rejectionReason}
+                        </div>
+                      )}
+
+                      {order.status === 'cancelled' && (
+                        <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-700 font-medium">
+                          <strong>🚫 Cancellation Reason:</strong> {order.cancellationReason || 'No reason provided.'}
                         </div>
                       )}
                     </div>
@@ -2108,6 +2192,13 @@ export default function App() {
                             Sync Offline Orders ({pendingOrders.length})
                           </button>
                         )}
+                        <button
+                          onClick={handleRefreshOrders}
+                          disabled={!isOnline || isLoading}
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1 px-3 rounded-lg text-xs transition-colors border border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isLoading ? 'Refreshing...' : '↻ Refresh Orders'}
+                        </button>
                       </div>
                     </div>
                     {allOrders.length === 0 ? (
@@ -2145,7 +2236,7 @@ export default function App() {
                                 >
                                   View / Print Bill
                                 </button>
-                                {order.status !== 'rejected' && (
+                                {order.status !== 'rejected' && order.status !== 'cancelled' && (
                                   <button
                                     onClick={() => {
                                       setRejectingOrderId(order.id!);
@@ -2166,10 +2257,12 @@ export default function App() {
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                       : order.status === 'rejected'
                                       ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                      : order.status === 'cancelled'
+                                      ? 'bg-slate-100 text-slate-600 border-slate-300'
                                       : 'bg-amber-50 text-amber-700 border-amber-200'
                                   }`}
                                 >
-                                  {order.status === 'synced' ? 'Synced' : order.status === 'rejected' ? 'Rejected' : 'Pending Sync'}
+                                  {order.status === 'synced' ? 'Synced' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled by Customer' : 'Pending Sync'}
                                 </span>
                               </div>
                             </div>
@@ -2185,7 +2278,13 @@ export default function App() {
 
                             {order.status === 'rejected' && order.rejectionReason && (
                               <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-850">
-                                <strong>Rejection Reason:</strong> {order.rejectionReason}
+                                <strong>⚠️ Rejection Reason:</strong> {order.rejectionReason}
+                              </div>
+                            )}
+
+                            {order.status === 'cancelled' && (
+                              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-700">
+                                <strong>🚫 Customer Cancellation Reason:</strong> {order.cancellationReason || 'No reason provided by customer.'}
                               </div>
                             )}
 
@@ -3033,6 +3132,52 @@ export default function App() {
                   className="flex-1 bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md"
                 >
                   Reject Order
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Cancel Order Modal */}
+      {cancellingOrderId && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
+          <div className="bg-white border border-slate-200 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">🚫</span>
+              <h3 className="text-lg font-bold font-serif text-slate-800">Cancel Order</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Please provide a reason for cancelling your order. This will be visible to the seller in real-time.
+            </p>
+            <form onSubmit={handleCancelOrderSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Cancellation Reason *</label>
+                <textarea
+                  required
+                  placeholder="e.g. Ordered by mistake, found better price, changed my mind..."
+                  value={cancellationReasonText}
+                  onChange={(e) => setCancellationReasonText(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-slate-400 h-20 resize-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancellingOrderId(null);
+                    setCancellationReasonText('');
+                  }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-xs transition-colors border border-slate-200"
+                >
+                  Go Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white font-bold py-2 rounded-lg text-xs transition-colors shadow-md"
+                >
+                  {isLoading ? 'Cancelling...' : 'Confirm Cancellation'}
                 </button>
               </div>
             </form>
