@@ -130,6 +130,7 @@ export default function App() {
   const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI');
   const [rejectingOrderId, setRejectingOrderId] = useState<number | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
+  const [readOrderIds, setReadOrderIds] = useState<string[]>(() => JSON.parse(localStorage.getItem('admin_read_order_ids') || '[]'));
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -265,24 +266,67 @@ export default function App() {
         // Orders realtime subscription
         const ordersChannel = supabase
           .channel('realtime-orders')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
-            console.log('Realtime order change payload received: ', payload);
-            if (payload.eventType === 'DELETE') {
-              await db.orders.delete(Number(payload.old.id));
-            } else {
-              const item = payload.new;
-              await db.orders.put({
-                id: Number(item.id),
-                receiptId: item.receipt_id,
-                items: item.items,
-                totalAmount: item.total_amount,
-                shippingInfo: item.shipping_info,
-                summary: item.summary,
-                status: item.status || 'synced',
-                rejectionReason: item.rejection_reason || undefined,
-                createdAt: new Date(item.created_at).getTime()
-              });
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
+            console.log('Realtime new order received: ', payload);
+            const item = payload.new;
+            await db.orders.put({
+              id: Number(item.id),
+              receiptId: item.receipt_id,
+              items: item.items,
+              totalAmount: item.total_amount,
+              shippingInfo: item.shipping_info,
+              summary: item.summary,
+              status: item.status || 'synced',
+              rejectionReason: item.rejection_reason || undefined,
+              createdAt: new Date(item.created_at).getTime()
+            });
+
+            // Trigger real-time notifications for the Admin
+            const localUserPhone = localStorage.getItem('auth_user_phone') || '';
+            const ADMIN_PHONES_LIST = ['7890784816', '7059782504'];
+            const userIsAdmin = !!localUserPhone && ADMIN_PHONES_LIST.includes(localUserPhone);
+
+            if (userIsAdmin) {
+              showToast(`🔔 New Order Received: #${item.receipt_id || item.id}!`, 'info');
+              try {
+                const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 Note
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+              } catch (e) {
+                // Autoplay block bypass
+              }
             }
+          })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload) => {
+            console.log('Realtime order updated: ', payload);
+            const item = payload.new;
+            await db.orders.put({
+              id: Number(item.id),
+              receiptId: item.receipt_id,
+              items: item.items,
+              totalAmount: item.total_amount,
+              shippingInfo: item.shipping_info,
+              summary: item.summary,
+              status: item.status || 'synced',
+              rejectionReason: item.rejection_reason || undefined,
+              createdAt: new Date(item.created_at).getTime()
+            });
+
+            // Alert customer in real-time if their order has been rejected by Admin
+            const localUserPhone = localStorage.getItem('auth_user_phone') || '';
+            const isCustomerOrder = item.shipping_info?.phone === localUserPhone;
+            if (isCustomerOrder && item.status === 'rejected') {
+              showToast(`⚠️ Order #${item.receipt_id || item.id} has been Rejected. Remarks: ${item.rejection_reason || 'No remarks note provided.'}`, 'error');
+            }
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, async (payload) => {
+            await db.orders.delete(Number(payload.old.id));
           })
           .subscribe();
 
@@ -443,7 +487,9 @@ export default function App() {
       );
 
       const orderStatus = isOnline ? 'synced' : 'pending_sync';
-      const orderData: Omit<Order, 'id'> = {
+      const uniqueId = Date.now() + Math.floor(Math.random() * 100000);
+      const orderData: Order = {
+        id: uniqueId,
         items: orderItems,
         totalAmount: finalGrandTotal,
         status: orderStatus,
@@ -750,6 +796,12 @@ export default function App() {
       ];
 
       await db.products.update(selectedProduct.id, { reviews: updatedReviews });
+      if (isCloudConfigured()) {
+        const updated = await db.products.get(selectedProduct.id);
+        if (updated) {
+          await syncProductToCloud(updated);
+        }
+      }
       setSelectedProduct({
         ...selectedProduct,
         reviews: updatedReviews,
@@ -833,6 +885,16 @@ export default function App() {
 
   // Filter orders for the logged-in customer
   const customerOrders = allOrders.filter(order => order.shippingInfo?.phone === user?.phone);
+
+  // Unread orders counting helper
+  const unreadOrdersCount = allOrders.filter(o => !readOrderIds.includes(String(o.id))).length;
+
+  const handleMarkAllOrdersRead = () => {
+    const allIds = allOrders.map(o => String(o.id));
+    localStorage.setItem('admin_read_order_ids', JSON.stringify(allIds));
+    setReadOrderIds(allIds);
+    showToast('All new order notifications marked as read.', 'success');
+  };
 
   // Countries options list
   const countries = Object.keys(LOCATION_DATA);
@@ -931,10 +993,15 @@ export default function App() {
           {isAdmin(user?.phone) && (
             <button
               onClick={() => setCurrentPage('admin')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
                 }`}
             >
-              Admin Panel
+              <span>Admin Panel</span>
+              {unreadOrdersCount > 0 && (
+                <span className="bg-rose-105 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+                  {unreadOrdersCount}
+                </span>
+              )}
             </button>
           )}
         </div>
@@ -1459,7 +1526,7 @@ export default function App() {
 
                       {order.status === 'rejected' && order.rejectionReason && (
                         <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-xs text-rose-800 font-medium">
-                          <strong>Rejection Reason:</strong> {order.rejectionReason}
+                          <strong>Remarks Note / Reason:</strong> {order.rejectionReason}
                         </div>
                       )}
                     </div>
@@ -1997,25 +2064,46 @@ export default function App() {
 
                   {/* Orders Log */}
                   <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-lg text-slate-805">Orders Log</h3>
-                      {pendingOrders.length > 0 && (
-                        <button
-                          onClick={handleSyncOrders}
-                          className="bg-emerald-600 hover:bg-emerald-550 text-white font-semibold py-1 px-3 rounded-lg text-xs transition-colors"
-                        >
-                          Sync Offline Orders ({pendingOrders.length})
-                        </button>
-                      )}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-rose-50 pb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-slate-805">Orders Log</h3>
+                        {unreadOrdersCount > 0 && (
+                          <span className="bg-rose-100 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">
+                            {unreadOrdersCount} New
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {unreadOrdersCount > 0 && (
+                          <button
+                            onClick={handleMarkAllOrdersRead}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-1 px-3 rounded-lg text-xs transition-colors border border-rose-200"
+                          >
+                            Mark all as read
+                          </button>
+                        )}
+                        {pendingOrders.length > 0 && (
+                          <button
+                            onClick={handleSyncOrders}
+                            className="bg-emerald-600 hover:bg-emerald-550 text-white font-semibold py-1 px-3 rounded-lg text-xs transition-colors"
+                          >
+                            Sync Offline Orders ({pendingOrders.length})
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {allOrders.length === 0 ? (
-                      <p className="text-slate-400 text-sm">No orders registered on this device.</p>
+                      <p className="text-slate-405 text-sm">No orders registered on this device.</p>
                     ) : (
                       <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                         {allOrders.map((order) => (
                           <div
                             key={order.id}
-                            className="bg-rose-50/30 border border-rose-100 p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm"
+                            className={`p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm relative border ${
+                              !readOrderIds.includes(String(order.id))
+                                ? 'border-rose-300 bg-rose-50/50 shadow-md shadow-rose-100/50 ring-1 ring-rose-200'
+                                : 'border-rose-100 bg-rose-50/30'
+                            }`}
                           >
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start border-b border-rose-100/50 pb-2 gap-2">
                               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
@@ -2027,14 +2115,28 @@ export default function App() {
 
                               <div className="flex flex-wrap items-center gap-2 shrink-0">
                                 <button
-                                  onClick={() => setActiveReceiptOrder(order)}
+                                  onClick={() => {
+                                    setActiveReceiptOrder(order);
+                                    if (!readOrderIds.includes(String(order.id))) {
+                                      const updated = [...readOrderIds, String(order.id)];
+                                      setReadOrderIds(updated);
+                                      localStorage.setItem('admin_read_order_ids', JSON.stringify(updated));
+                                    }
+                                  }}
                                   className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-250 transition-colors"
                                 >
                                   View / Print Bill
                                 </button>
                                 {order.status !== 'rejected' && (
                                   <button
-                                    onClick={() => setRejectingOrderId(order.id!)}
+                                    onClick={() => {
+                                      setRejectingOrderId(order.id!);
+                                      if (!readOrderIds.includes(String(order.id))) {
+                                        const updated = [...readOrderIds, String(order.id)];
+                                        setReadOrderIds(updated);
+                                        localStorage.setItem('admin_read_order_ids', JSON.stringify(updated));
+                                      }
+                                    }}
                                     className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-0.5 rounded border border-rose-200 transition-colors"
                                   >
                                     Reject
