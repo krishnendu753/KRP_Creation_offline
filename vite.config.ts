@@ -19,10 +19,22 @@ export default defineConfig({
         theme_color: '#4f46e5',
         icons: [
           {
-            src: 'favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'logo.jpg',
+            sizes: '512x512',
+            type: 'image/jpeg',
             purpose: 'any'
+          },
+          {
+            src: 'logo.jpg',
+            sizes: '192x192',
+            type: 'image/jpeg',
+            purpose: 'any'
+          },
+          {
+            src: 'logo.jpg',
+            sizes: '192x192',
+            type: 'image/jpeg',
+            purpose: 'maskable'
           }
         ]
       },
