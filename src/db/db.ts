@@ -76,6 +76,7 @@ export interface Announcement {
   id: string; // 'global' or unique id
   content: string;
   liveUrl?: string; // Facebook Live link
+  bigNotice?: string; // Big homepage popup/notice text
   updatedAt: number;
 }
 

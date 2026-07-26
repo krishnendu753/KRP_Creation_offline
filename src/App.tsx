@@ -138,6 +138,7 @@ export default function App() {
   const [editDeliveryCharge, setEditDeliveryCharge] = useState('');
   const [editSafetyFee, setEditSafetyFee] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
+  const [editCategory, setEditCategory] = useState('Saree');
   const [editProductImage, setEditProductImage] = useState('');
   const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
@@ -164,6 +165,8 @@ export default function App() {
   // Announcements & Events Admin States
   const [announcementContent, setAnnouncementContent] = useState('');
   const [facebookLiveUrl, setFacebookLiveUrl] = useState('');
+  const [bigNoticeContent, setBigNoticeContent] = useState('');
+  const [showBigNotice, setShowBigNotice] = useState(true);
 
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState<'live' | 'exhibition' | 'product_launch' | 'biggest_offer' | 'other'>('live');
@@ -196,12 +199,21 @@ export default function App() {
 
   // Automatically redirect based on user authentication state (Allowing 'home' tab view first)
   useEffect(() => {
-    if (user) {
-      setCurrentPage('catalog');
-    } else {
-      setCurrentPage('home');
-    }
+    // if (user) {
+    //   setCurrentPage('catalog');
+    // } else {
+    setCurrentPage('home');
+    //}
   }, [user]);
+
+  // Prepopulate Announcements admin inputs when announcementsList loads
+  useEffect(() => {
+    if (announcementsList.length > 0) {
+      setAnnouncementContent(announcementsList[0].content || '');
+      setFacebookLiveUrl(announcementsList[0].liveUrl || '');
+      setBigNoticeContent(announcementsList[0].bigNotice || '');
+    }
+  }, [announcementsList]);
 
   // Pull catalog products and global configurations from cloud on mount or online status change
   useEffect(() => {
@@ -436,8 +448,11 @@ export default function App() {
                 id: item.id,
                 content: item.content,
                 liveUrl: item.live_url || undefined,
+                bigNotice: item.big_notice || undefined,
                 updatedAt: new Date(item.updated_at).getTime()
               });
+              // Reset the popup view so it re-opens on updates
+              setShowBigNotice(true);
             }
           })
           .subscribe();
@@ -456,6 +471,7 @@ export default function App() {
                 title: item.title,
                 type: item.type,
                 eventDate: item.event_date,
+                eventEndDate: item.event_end_date || undefined,
                 description: item.description,
                 linkUrl: item.link_url || undefined,
                 createdAt: new Date(item.created_at).getTime()
@@ -828,6 +844,7 @@ export default function App() {
 
       await db.products.update(editingProductId, {
         price: isNaN(priceVal) ? 0 : priceVal,
+        category: editCategory,
         stock: isNaN(stockVal) ? 0 : stockVal,
         discount: discountVal,
         isFestiveDiscount: !!editFestivalName,
@@ -1039,13 +1056,14 @@ export default function App() {
         id: 'global',
         content: announcementContent.trim(),
         liveUrl: facebookLiveUrl.trim() || undefined,
+        bigNotice: bigNoticeContent.trim() || undefined,
         updatedAt: Date.now()
       };
       await db.announcements.put(annObj);
       if (isCloudConfigured()) {
         await syncAnnouncementToCloud(annObj);
       }
-      showToast('Announcement and Facebook Live settings updated!', 'success');
+      showToast('Announcement, Facebook Live and Big Notice settings updated!', 'success');
     } catch (err) {
       console.error(err);
       showToast('Failed to save announcements/Live URL.', 'error');
@@ -1351,6 +1369,32 @@ export default function App() {
               </div>
             )}
 
+            {/* Big Notice Floating Pinned Card */}
+            {announcementsList.length > 0 && announcementsList[0].bigNotice && showBigNotice && (
+              <div className="fixed bottom-4 right-4 z-50 p-4 max-w-sm w-[calc(100vw-2rem)] bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl shadow-2xl overflow-hidden text-slate-800 animate-in slide-in-from-bottom-5 duration-300 print:hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-200/20 rounded-full blur-xl pointer-events-none" />
+
+                <button
+                  onClick={() => setShowBigNotice(false)}
+                  className="absolute top-2.5 right-2.5 bg-amber-100/80 hover:bg-amber-200 text-amber-800 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-amber-200/50"
+                  title="Close Notice"
+                >
+                  ✕
+                </button>
+
+                <div className="flex items-center gap-2 text-amber-900 border-b border-amber-200/50 pb-2 mb-2">
+                  <span className="text-base animate-bounce">📌</span>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider font-serif">Our Notice/Announcement</h3>
+                </div>
+
+                <div className="max-h-36 overflow-y-auto pr-1">
+                  <p className="text-slate-800 text-[11px] sm:text-xs font-bold leading-relaxed whitespace-pre-wrap">
+                    {announcementsList[0].bigNotice}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Active Facebook Live Stream Section */}
             {announcementsList.length > 0 && announcementsList[0].liveUrl && (
               <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-3xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4 border border-blue-500/20">
@@ -1474,7 +1518,7 @@ export default function App() {
                             <h4 className="font-bold text-sm sm:text-base text-slate-800 mt-1">{ev.title}</h4>
                           </div>
                           <span className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1 shrink-0">
-                            📅 {moment(ev.eventDate).format('D MMM YYYY')} 
+                            📅 {moment(ev.eventDate).format('D MMM YYYY')}
                             {ev.eventEndDate && ` - ${moment(ev.eventEndDate).format('D MMM YYYY')}`}
                           </span>
                         </div>
@@ -2376,6 +2420,7 @@ export default function App() {
                                       setEditingProductId(prod.id);
                                       setEditStock(String(prod.stock));
                                       setEditPrice(String(prod.price));
+                                      setEditCategory(prod.category || 'Saree');
                                       setEditDiscount(String(prod.discount || ''));
                                       setEditFestivalName(prod.festiveName || '');
                                       setEditDeliveryCharge(String(prod.deliveryCharge || 0));
@@ -2606,6 +2651,15 @@ export default function App() {
                             className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-800"
                           />
                         </div>
+                        <div>
+                          <label className="block text-slate-655 font-bold mb-1">Homepage Big Notice Content (Optional)</label>
+                          <textarea
+                            value={bigNoticeContent}
+                            onChange={(e) => setBigNoticeContent(e.target.value)}
+                            placeholder="Type a larger shop announcement or holiday notice to display on the home landing page..."
+                            className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 h-28 text-slate-800"
+                          />
+                        </div>
                         <button
                           type="submit"
                           className="bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 px-4 rounded-lg shadow-sm"
@@ -2705,9 +2759,8 @@ export default function App() {
                               )}
                               <button
                                 type="submit"
-                                className={`font-bold py-2 rounded-lg transition-colors shadow-sm text-white ${
-                                  editingEventId ? 'w-1/2 bg-amber-600 hover:bg-amber-550' : 'w-full bg-rose-600 hover:bg-rose-550'
-                                }`}
+                                className={`font-bold py-2 rounded-lg transition-colors shadow-sm text-white ${editingEventId ? 'w-1/2 bg-amber-600 hover:bg-amber-550' : 'w-full bg-rose-600 hover:bg-rose-550'
+                                  }`}
                               >
                                 {editingEventId ? 'Save Changes' : 'Create Event'}
                               </button>
@@ -3085,21 +3138,21 @@ export default function App() {
 
             <div className="my-5">
               {/* Clickable QR Code scanner targeting direct payment app redirects */}
-              <a 
+              <a
                 href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL&am=${cartGrandTotal.toFixed(2)}&tn=KRP%20Creation%20Order&cu=INR`}
                 title="Pay with UPI App"
                 className="block hover:opacity-95 transition-opacity"
               >
-                <img 
-                  src={`${localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co'}/storage/v1/object/public/assets/qr_phonepe.jpg`} 
-                  alt="Scan to Pay PhonePe" 
+                <img
+                  src={`${localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co'}/storage/v1/object/public/assets/qr_phonepe.jpg`}
+                  alt="Scan to Pay PhonePe"
                   className="w-48 h-auto mx-auto border-2 border-rose-100 p-1 rounded-2xl bg-white shadow-sm cursor-pointer"
                 />
               </a>
             </div>
 
             {/* Clickable UPI link details */}
-            <a 
+            <a
               href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL&am=${cartGrandTotal.toFixed(2)}&tn=KRP%20Creation%20Order&cu=INR`}
               className="block bg-rose-50 hover:bg-rose-100/80 border border-rose-100 p-3 rounded-xl mb-4 text-xs space-y-1 transition-colors cursor-pointer text-left"
             >
@@ -3570,6 +3623,20 @@ export default function App() {
                     onChange={(e) => setEditStock(e.target.value)}
                     className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                   />
+                </div>
+                <div>
+                  <label className="block text-slate-655 font-semibold mb-1">Product Category *</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
+                  >
+                    <option value="Saree">Saree</option>
+                    <option value="Dress">Dress</option>
+                    <option value="Kurti">Kurti</option>
+                    <option value="Salwar Suit">Salwar Suit</option>
+                    <option value="Jackets">Jackets</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

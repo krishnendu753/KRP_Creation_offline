@@ -262,6 +262,7 @@ export const syncAnnouncementToCloud = async (ann: Announcement) => {
       id: ann.id,
       content: ann.content,
       live_url: ann.liveUrl || null,
+      big_notice: ann.bigNotice || null,
       updated_at: new Date(ann.updatedAt).toISOString()
     });
 
@@ -290,6 +291,7 @@ export const pullAnnouncementsFromCloud = async (): Promise<number> => {
       id: item.id,
       content: item.content,
       liveUrl: item.live_url || undefined,
+      bigNotice: item.big_notice || undefined,
       updatedAt: new Date(item.updated_at).getTime()
     }));
     await db.announcements.bulkPut(formatted);
