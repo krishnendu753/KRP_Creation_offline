@@ -3091,7 +3091,7 @@ export default function App() {
                 className="block hover:opacity-95 transition-opacity"
               >
                 <img 
-                  src="https://ggbevhaudwhbpevjbdhq.supabase.co/storage/v1/object/public/assets/qr_phonepe.jpg" 
+                  src={`${localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co'}/storage/v1/object/public/assets/qr_phonepe.jpg`} 
                   alt="Scan to Pay PhonePe" 
                   className="w-48 h-auto mx-auto border-2 border-rose-100 p-1 rounded-2xl bg-white shadow-sm cursor-pointer"
                 />
