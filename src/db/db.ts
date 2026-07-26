@@ -75,7 +75,7 @@ class OfflineEcommerceDB extends Dexie {
       users: '++id, &phone',
       products: 'id, category',
       cart: '++id, productId',
-      orders: '++id, status'
+      orders: '++id, status, receiptId'
     });
   }
 }

@@ -108,13 +108,12 @@ export const pullProductsFromCloud = async (): Promise<number> => {
   return 0;
 };
 
-// Sync orders to Supabase cloud
+// Sync orders to Supabase cloud using receiptId as unique key
 export const syncOrdersToCloud = async (orders: Order[]) => {
   const supabase = getSupabaseClient();
   if (!supabase) return;
 
   const formatted = orders.map(order => ({
-    id: order.id,
     receipt_id: order.receiptId,
     items: order.items,
     total_amount: order.totalAmount,
@@ -127,7 +126,7 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
 
   const { error } = await supabase
     .from('orders')
-    .upsert(formatted);
+    .upsert(formatted, { onConflict: 'receipt_id' });
 
   if (error) {
     console.error("Failed to sync orders to cloud: ", error.message);
@@ -135,7 +134,7 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
   }
 };
 
-// Fetch all customer orders from Supabase to sync to local Dexie for Admin viewing
+// Fetch all customer orders from Supabase, merging into local Dexie by receiptId
 export const pullOrdersFromCloud = async (): Promise<number> => {
   const supabase = getSupabaseClient();
   if (!supabase) return 0;
@@ -150,18 +149,35 @@ export const pullOrdersFromCloud = async (): Promise<number> => {
   }
 
   if (data && data.length > 0) {
-    const ordersToPut = data.map(item => ({
-      id: Number(item.id),
-      receiptId: item.receipt_id,
-      items: item.items,
-      totalAmount: item.total_amount,
-      shippingInfo: item.shipping_info,
-      summary: item.summary,
-      status: item.status || 'synced',
-      rejectionReason: item.rejection_reason || undefined,
-      createdAt: new Date(item.created_at).getTime()
-    }));
-    await db.orders.bulkPut(ordersToPut);
+    // Get all local orders and index by receiptId to avoid duplicates
+    const localOrders = await db.orders.toArray();
+    const localByReceiptId = new Map(localOrders.map(o => [o.receiptId, o.id!]));
+
+    for (const item of data) {
+      const cloudReceiptId = item.receipt_id;
+      const orderPayload = {
+        receiptId: cloudReceiptId,
+        items: item.items,
+        totalAmount: item.total_amount,
+        shippingInfo: item.shipping_info,
+        summary: item.summary,
+        status: item.status || 'synced',
+        rejectionReason: item.rejection_reason || undefined,
+        createdAt: new Date(item.created_at).getTime()
+      };
+
+      const existingLocalId = localByReceiptId.get(cloudReceiptId);
+      if (existingLocalId !== undefined) {
+        // Update status/rejection on existing local record
+        await db.orders.update(existingLocalId, {
+          status: orderPayload.status,
+          rejectionReason: orderPayload.rejectionReason,
+        });
+      } else {
+        // Insert as new local order
+        await db.orders.add(orderPayload);
+      }
+    }
     return data.length;
   }
   return 0;

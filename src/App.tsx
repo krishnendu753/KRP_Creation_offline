@@ -221,7 +221,7 @@ export default function App() {
               await db.products.delete(payload.old.id);
             } else {
               const item = payload.new;
-              await db.products.put({
+              const updatedProduct = {
                 id: item.id,
                 name: item.name,
                 price: item.price,
@@ -236,7 +236,10 @@ export default function App() {
                 safetyFee: item.safety_fee,
                 isActive: item.is_active,
                 reviews: item.reviews || []
-              });
+              };
+              await db.products.put(updatedProduct);
+              // If the user currently has this product open, update its state live
+              setSelectedProduct(prev => prev?.id === item.id ? updatedProduct : prev);
             }
           })
           .subscribe();
@@ -269,17 +272,21 @@ export default function App() {
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
             console.log('Realtime new order received: ', payload);
             const item = payload.new;
-            await db.orders.put({
-              id: Number(item.id),
-              receiptId: item.receipt_id,
-              items: item.items,
-              totalAmount: item.total_amount,
-              shippingInfo: item.shipping_info,
-              summary: item.summary,
-              status: item.status || 'synced',
-              rejectionReason: item.rejection_reason || undefined,
-              createdAt: new Date(item.created_at).getTime()
-            });
+            // Only add if not already stored locally (avoid duplicates from self-sync)
+            const localOrders = await db.orders.toArray();
+            const alreadyExists = localOrders.some(o => o.receiptId === item.receipt_id);
+            if (!alreadyExists) {
+              await db.orders.add({
+                receiptId: item.receipt_id,
+                items: item.items,
+                totalAmount: item.total_amount,
+                shippingInfo: item.shipping_info,
+                summary: item.summary,
+                status: item.status || 'synced',
+                rejectionReason: item.rejection_reason || undefined,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
 
             // Trigger real-time notifications for the Admin
             const localUserPhone = localStorage.getItem('auth_user_phone') || '';
@@ -287,14 +294,14 @@ export default function App() {
             const userIsAdmin = !!localUserPhone && ADMIN_PHONES_LIST.includes(localUserPhone);
 
             if (userIsAdmin) {
-              showToast(`🔔 New Order Received: #${item.receipt_id || item.id}!`, 'info');
+              showToast(`🔔 New Order Received: #${item.receipt_id}!`, 'info');
               try {
                 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 Note
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
                 gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.2);
@@ -306,27 +313,39 @@ export default function App() {
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload) => {
             console.log('Realtime order updated: ', payload);
             const item = payload.new;
-            await db.orders.put({
-              id: Number(item.id),
-              receiptId: item.receipt_id,
-              items: item.items,
-              totalAmount: item.total_amount,
-              shippingInfo: item.shipping_info,
-              summary: item.summary,
-              status: item.status || 'synced',
-              rejectionReason: item.rejection_reason || undefined,
-              createdAt: new Date(item.created_at).getTime()
-            });
+            // Find local order by receiptId and update it
+            const localOrders = await db.orders.toArray();
+            const existing = localOrders.find(o => o.receiptId === item.receipt_id);
+            if (existing && existing.id !== undefined) {
+              await db.orders.update(existing.id, {
+                status: item.status || 'synced',
+                rejectionReason: item.rejection_reason || undefined,
+              });
+            } else if (!existing) {
+              // New order we don't have locally yet — add it
+              await db.orders.add({
+                receiptId: item.receipt_id,
+                items: item.items,
+                totalAmount: item.total_amount,
+                shippingInfo: item.shipping_info,
+                summary: item.summary,
+                status: item.status || 'synced',
+                rejectionReason: item.rejection_reason || undefined,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
 
-            // Alert customer in real-time if their order has been rejected by Admin
+            // Alert customer in real-time if their order has been rejected
             const localUserPhone = localStorage.getItem('auth_user_phone') || '';
             const isCustomerOrder = item.shipping_info?.phone === localUserPhone;
             if (isCustomerOrder && item.status === 'rejected') {
-              showToast(`⚠️ Order #${item.receipt_id || item.id} has been Rejected. Remarks: ${item.rejection_reason || 'No remarks note provided.'}`, 'error');
+              showToast(`⚠️ Order #${item.receipt_id} has been Rejected. Remarks: ${item.rejection_reason || 'No remarks note provided.'}`, 'error');
             }
           })
           .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, async (payload) => {
-            await db.orders.delete(Number(payload.old.id));
+            const localOrders = await db.orders.toArray();
+            const existing = localOrders.find(o => o.receiptId === payload.old.receipt_id);
+            if (existing?.id !== undefined) await db.orders.delete(existing.id);
           })
           .subscribe();
 
@@ -487,9 +506,7 @@ export default function App() {
       );
 
       const orderStatus = isOnline ? 'synced' : 'pending_sync';
-      const uniqueId = Date.now() + Math.floor(Math.random() * 100000);
-      const orderData: Order = {
-        id: uniqueId,
+      const orderData: Omit<Order, 'id'> = {
         items: orderItems,
         totalAmount: finalGrandTotal,
         status: orderStatus,
@@ -1776,8 +1793,9 @@ export default function App() {
                         try {
                           const count = await pullProductsFromCloud();
                           showToast(`Initial sync completed: loaded ${count} products!`, 'success');
-                        } catch (err) {
-                          showToast('Initial sync failed: please verify URL and Key.', 'error');
+                        } catch (err: any) {
+                          console.error('Cloud sync failed:', err);
+                          showToast(`Sync failed: ${err.message || 'Check URL and Key.'}`, 'error');
                         } finally {
                           setIsLoading(false);
                         }
