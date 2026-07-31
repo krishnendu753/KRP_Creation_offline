@@ -29,6 +29,7 @@ export interface Product {
   isActive?: boolean; // Active/Inactive toggle
   reviews?: Array<{ reviewerName: string; rating: number; comment: string; createdAt: number }>;
   sizes?: ProductSize[]; // List of available sizes and their lengths
+  updatedAt?: string; // Last updated timestamp
 }
 
 export interface CartItem {

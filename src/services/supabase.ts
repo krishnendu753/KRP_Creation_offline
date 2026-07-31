@@ -47,7 +47,7 @@ export const syncProductToCloud = async (product: Product) => {
       is_active: product.isActive !== false,
       reviews: product.reviews || [],
       sizes: product.sizes || [],
-      updated_at: new Date().toISOString()
+      updated_at: product.updatedAt || new Date().toISOString()
     });
 
   if (error) {
@@ -102,7 +102,8 @@ export const pullProductsFromCloud = async (): Promise<number> => {
       safetyFee: item.safety_fee,
       isActive: item.is_active,
       reviews: item.reviews || [],
-      sizes: item.sizes || []
+      sizes: item.sizes || [],
+      updatedAt: item.updated_at
     }));
     await db.products.bulkPut(productsToPut);
     return data.length;

@@ -140,6 +140,8 @@ export default function App() {
   const [editIsActive, setEditIsActive] = useState(true);
   const [editCategory, setEditCategory] = useState('Saree');
   const [editProductImage, setEditProductImage] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
   const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
   const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co');
@@ -183,6 +185,11 @@ export default function App() {
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
+
+  // Catalog Filter States
+  const [filterSize, setFilterSize] = useState<string>('');
+  const [filterMaxPrice, setFilterMaxPrice] = useState<string>('');
+  const [filterMinRating, setFilterMinRating] = useState<string>('');
 
   // Global UI States (Loader & Toast)
   const [isLoading, setIsLoading] = useState(false);
@@ -311,7 +318,8 @@ export default function App() {
                 safetyFee: item.safety_fee,
                 isActive: item.is_active,
                 reviews: item.reviews || [],
-                sizes: item.sizes || []
+                sizes: item.sizes || [],
+                updatedAt: item.updated_at
               };
               await db.products.put(updatedProduct);
               // If the user currently has this product open, update its state live
@@ -831,7 +839,7 @@ export default function App() {
     }
   };
 
-  // Admin update product details (restock, discount, status)
+  // Admin update product details (restock, discount, status, name, description)
   const handleUpdateProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProductId) return;
@@ -841,8 +849,11 @@ export default function App() {
       const stockVal = parseInt(editStock);
       const discountVal = parseInt(editDiscount) || 0;
       const priceVal = parseFloat(editPrice);
+      const nowStr = new Date().toISOString();
 
       await db.products.update(editingProductId, {
+        name: editName.trim(),
+        description: editDesc.trim(),
         price: isNaN(priceVal) ? 0 : priceVal,
         category: editCategory,
         stock: isNaN(stockVal) ? 0 : stockVal,
@@ -853,7 +864,8 @@ export default function App() {
         safetyFee: parseFloat(editSafetyFee) || 0,
         isActive: editIsActive,
         imageUrl: editProductImage || '',
-        sizes: [...productSizesInput]
+        sizes: [...productSizesInput],
+        updatedAt: nowStr
       });
 
       if (isCloudConfigured()) {
@@ -1178,8 +1190,33 @@ export default function App() {
   const cartSgst = gstEnabled ? cartNetPrice * (sgstRate / 100) : 0;
   const cartGrandTotal = cartNetPrice + cartCgst + cartSgst + cartDeliverySum + packagingFee + cartSafetySum;
 
-  // Filter products for customer: only display active ones
-  const activeProducts = products.filter(p => p.isActive !== false);
+  // Filter products for customer: only display active ones matching active size, maxPrice, and minRating filters
+  const activeProducts = products.filter(p => {
+    if (p.isActive === false) return false;
+
+    // Size filter check
+    if (filterSize) {
+      const hasSize = p.sizes?.some(s => s.size === filterSize);
+      if (!hasSize) return false;
+    }
+
+    // Price filter check
+    if (filterMaxPrice) {
+      const discountedPrice = getProductPrice(p);
+      if (discountedPrice > parseFloat(filterMaxPrice)) return false;
+    }
+
+    // Rating filter check
+    if (filterMinRating) {
+      const productReviews = p.reviews || [];
+      const avgRating = productReviews.length > 0
+        ? productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length
+        : 0;
+      if (avgRating < parseFloat(filterMinRating)) return false;
+    }
+
+    return true;
+  });
 
   // Filter orders for the logged-in customer
   const customerOrders = allOrders.filter(order => order.shippingInfo?.phone === user?.phone);
@@ -1590,8 +1627,77 @@ export default function App() {
               )}
             </div>
 
+            {/* Catalog Filters Bar */}
+            <div className="bg-white border border-rose-100 p-4 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-700 font-bold text-sm shrink-0">
+                <span>🔍 Filter Collection:</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto flex-1 md:max-w-3xl">
+                {/* Size Filter selector */}
+                <div>
+                  <select
+                    value={filterSize}
+                    onChange={(e) => setFilterSize(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  >
+                    <option value="">Filter by Size (All)</option>
+                    <option value="S">Small (S)</option>
+                    <option value="M">Medium (M)</option>
+                    <option value="L">Large (L)</option>
+                    <option value="XL">XL</option>
+                    <option value="XXL">XXL</option>
+                    <option value="Free Size">Free Size</option>
+                  </select>
+                </div>
+
+                {/* Price Filter slider/input */}
+                <div>
+                  <select
+                    value={filterMaxPrice}
+                    onChange={(e) => setFilterMaxPrice(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  >
+                    <option value="">Filter by Price (All)</option>
+                    <option value="500">Under ₹500</option>
+                    <option value="1000">Under ₹1000</option>
+                    <option value="1500">Under ₹1500</option>
+                    <option value="2000">Under ₹2000</option>
+                    <option value="3000">Under ₹3000</option>
+                  </select>
+                </div>
+
+                {/* Rating Filter selector */}
+                <div>
+                  <select
+                    value={filterMinRating}
+                    onChange={(e) => setFilterMinRating(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  >
+                    <option value="">Filter by Rating (All)</option>
+                    <option value="4">★ 4.0 & above</option>
+                    <option value="3">★ 3.0 & above</option>
+                    <option value="2">★ 2.0 & above</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Reset filter action button */}
+              {(filterSize || filterMaxPrice || filterMinRating) && (
+                <button
+                  onClick={() => {
+                    setFilterSize('');
+                    setFilterMaxPrice('');
+                    setFilterMinRating('');
+                  }}
+                  className="w-full md:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
             {isCatalogSyncing && activeProducts.length === 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-2 md:px-0">
                 {[1, 2, 3].map((n) => (
                   <div key={n} className="bg-white border border-rose-100/60 rounded-2xl p-4 space-y-4 animate-pulse">
                     <div className="bg-rose-50/60 h-64 w-full rounded-xl" />
@@ -1603,11 +1709,11 @@ export default function App() {
                 ))}
               </div>
             ) : activeProducts.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-rose-100 shadow-sm">
-                <p className="text-slate-550">Currently no products are visible in our catalog.</p>
+              <div className="text-center py-16 bg-white rounded-2xl border border-rose-100 shadow-sm mx-2 md:mx-0">
+                <p className="text-slate-550">Currently no products match your active filters.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-2 md:px-0">
                 {activeProducts.map((product) => {
                   const onSale = product.discount && product.discount > 0;
                   const discountedPrice = getProductPrice(product);
@@ -1699,19 +1805,37 @@ export default function App() {
                               <span className="text-xl font-extrabold text-slate-900">₹{product.price.toFixed(2)}</span>
                             )}
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(product);
-                            }}
-                            disabled={isSoldOut}
-                            className={`text-xs font-bold py-2 px-4 rounded-lg transition-colors shadow-sm ${isSoldOut
-                              ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
-                              : 'bg-rose-600 hover:bg-rose-500 text-white'
-                              }`}
-                          >
-                            Add to Cart
-                          </button>
+                          {(() => {
+                            const isInCart = cartItems.some((item) => item.productId === product.id);
+                            if (isInCart) {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCurrentPage('cart');
+                                  }}
+                                  className="text-xs font-bold py-2 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
+                                >
+                                  Go to Cart ➜
+                                </button>
+                              );
+                            }
+                            return (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddToCart(product);
+                                }}
+                                disabled={isSoldOut}
+                                className={`text-xs font-bold py-2 px-4 rounded-lg transition-colors shadow-sm ${isSoldOut
+                                  ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white'
+                                  }`}
+                              >
+                                Add to Cart
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1719,6 +1843,15 @@ export default function App() {
                 })}
               </div>
             )}
+
+            {/* Floating Scroll to Top Button */}
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="fixed bottom-6 left-6 z-40 bg-rose-600 hover:bg-rose-700 text-white w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 cursor-pointer border border-rose-450 hover:shadow-rose-600/25"
+              title="Scroll to Top"
+            >
+              ▲
+            </button>
           </div>
         )}
 
@@ -2263,6 +2396,9 @@ export default function App() {
                                   <option value="Kurti">Kurti</option>
                                   <option value="Salwar Suit">Salwar Suit</option>
                                   <option value="Jackets">Jackets</option>
+                                  <option value="pencil pants">pencil pants</option>
+                                  <option value="palazzo pants">palazzo pants</option>
+                                  <option value="pants">pants</option>
                                 </select>
                               </div>
 
@@ -2380,12 +2516,17 @@ export default function App() {
                                     </div>
                                   )}
                                   <div>
-                                    <div className="font-bold text-slate-805 flex items-center gap-1.5">
+                                    <div className="font-bold text-slate-805 flex flex-wrap items-center gap-1.5">
                                       <span>{prod.name}</span>
                                       <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${prod.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                                         }`}>
                                         {prod.isActive !== false ? 'Active' : 'Inactive'}
                                       </span>
+                                      {prod.updatedAt && (
+                                        <span className="text-[9px] text-slate-400 font-normal italic bg-slate-100 px-1.5 py-0.5 rounded">
+                                          Updated: {moment(prod.updatedAt).format('D MMM YYYY, h:mm a')}
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="text-slate-500 mt-0.5">
                                       Price: ₹{prod.price.toFixed(2)} • Stock: <span className={`font-semibold ${prod.stock <= 0 ? 'text-rose-600' : 'text-slate-700'}`}>{prod.stock}</span>
@@ -2420,6 +2561,8 @@ export default function App() {
                                       setEditingProductId(prod.id);
                                       setEditStock(String(prod.stock));
                                       setEditPrice(String(prod.price));
+                                      setEditName(prod.name || '');
+                                      setEditDesc(prod.description || '');
                                       setEditCategory(prod.category || 'Saree');
                                       setEditDiscount(String(prod.discount || ''));
                                       setEditFestivalName(prod.festiveName || '');
@@ -3519,34 +3662,55 @@ export default function App() {
             {/* Bottom Add to Cart banner */}
             <div className="bg-rose-50/50 p-4 border-t border-rose-100 flex items-center justify-between shrink-0">
               <span className="text-xs text-slate-450">Base Price: ₹{selectedProduct.price.toFixed(2)}</span>
-              <button
-                onClick={async () => {
-                  if (selectedProduct.sizes && selectedProduct.sizes.length > 0 && !selectedUserSize) {
-                    showToast('Please select a size and length before adding to cart.', 'error');
-                    return;
-                  }
-                  setIsLoading(true);
-                  try {
-                    await addToCart(selectedProduct.id, selectedUserSize || undefined);
-                    showToast(`${selectedProduct.name} added to cart successfully!`, 'success');
-                    setSelectedProduct(null);
-                    setSelectedUserSize(null);
-                    setReviewComment('');
-                    setReviewRating(5);
-                  } catch (err) {
-                    showToast('Failed to add item to cart.', 'error');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                disabled={selectedProduct.stock <= 0}
-                className={`font-bold py-2 px-6 rounded-lg transition-colors text-xs shadow-md ${selectedProduct.stock <= 0
-                  ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
-                  : 'bg-rose-600 hover:bg-rose-550 text-white'
-                  }`}
-              >
-                {selectedProduct.stock <= 0 ? 'Sold Out' : 'Add to Cart'}
-              </button>
+              {(() => {
+                const isInCart = cartItems.some((item) => item.productId === selectedProduct.id);
+                if (isInCart) {
+                  return (
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(null);
+                        setSelectedUserSize(null);
+                        setReviewComment('');
+                        setReviewRating(5);
+                        setCurrentPage('cart');
+                      }}
+                      className="font-bold py-2 px-6 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs shadow-md transition-colors"
+                    >
+                      Go to Cart ➜
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    onClick={async () => {
+                      if (selectedProduct.sizes && selectedProduct.sizes.length > 0 && !selectedUserSize) {
+                        showToast('Please select a size and length before adding to cart.', 'error');
+                        return;
+                      }
+                      setIsLoading(true);
+                      try {
+                        await addToCart(selectedProduct.id, selectedUserSize || undefined);
+                        showToast(`${selectedProduct.name} added to cart successfully!`, 'success');
+                        setSelectedProduct(null);
+                        setSelectedUserSize(null);
+                        setReviewComment('');
+                        setReviewRating(5);
+                      } catch (err) {
+                        showToast('Failed to add item to cart.', 'error');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={selectedProduct.stock <= 0}
+                    className={`font-bold py-2 px-6 rounded-lg transition-colors text-xs shadow-md ${selectedProduct.stock <= 0
+                      ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
+                      : 'bg-rose-600 hover:bg-rose-550 text-white'
+                      }`}
+                  >
+                    {selectedProduct.stock <= 0 ? 'Sold Out' : 'Add to Cart'}
+                  </button>
+                );
+              })()}
             </div>
 
           </div>
@@ -3602,6 +3766,25 @@ export default function App() {
 
               <form id="editProductForm" onSubmit={handleUpdateProductSubmit} className="space-y-4 text-xs">
                 <div>
+                  <label className="block text-slate-655 font-semibold mb-1">Product Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-655 font-semibold mb-1">Product Description *</label>
+                  <textarea
+                    required
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none h-20 resize-none"
+                  />
+                </div>
+                <div>
                   <label className="block text-slate-655 font-semibold mb-1">Edit Base Price (₹) *</label>
                   <input
                     type="number"
@@ -3636,6 +3819,9 @@ export default function App() {
                     <option value="Kurti">Kurti</option>
                     <option value="Salwar Suit">Salwar Suit</option>
                     <option value="Jackets">Jackets</option>
+                    <option value="pencil pants">pencil pants</option>
+                    <option value="palazzo pants">palazzo pants</option>
+                    <option value="pants">pants</option>
                   </select>
                 </div>
 
