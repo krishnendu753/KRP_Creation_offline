@@ -1862,9 +1862,9 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5 sm:mt-1">
                             <span className="text-[9px] sm:text-xs text-slate-400">Stock: {product.stock}</span>
-                            {onSale && product.discount > 0 ? (
+                            {onSale && product?.discount > 0 ? (
                               <span className="text-[8px] sm:text-[10px] bg-rose-100 text-rose-700 px-1 py-0.2 rounded font-bold">
-                                -{product.discount}%
+                                -{product?.discount}%
                               </span>
                             ) : (
                               <></>
