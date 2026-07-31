@@ -47,7 +47,9 @@ export const syncProductToCloud = async (product: Product) => {
       is_active: product.isActive !== false,
       reviews: product.reviews || [],
       sizes: product.sizes || [],
-      updated_at: product.updatedAt || new Date().toISOString()
+      color_variants: product.colorVariants || [],
+      updated_at: product.updatedAt || new Date().toISOString(),
+      whatsapp_enabled: product.whatsappEnabled !== false
     });
 
   if (error) {
@@ -103,7 +105,9 @@ export const pullProductsFromCloud = async (): Promise<number> => {
       isActive: item.is_active,
       reviews: item.reviews || [],
       sizes: item.sizes || [],
-      updatedAt: item.updated_at
+      colorVariants: item.color_variants || [],
+      updatedAt: item.updated_at,
+      whatsappEnabled: item.whatsapp_enabled !== false
     }));
     await db.products.bulkPut(productsToPut);
     return data.length;
@@ -196,6 +200,8 @@ export const syncSettingsToCloud = async (settings: {
   sgstRate: number;
   packagingFee: number;
   sellerInfoEnabled: boolean;
+  whatsappChannelUrl: string;
+  showProductWhatsapp: boolean;
 }) => {
   const supabase = getSupabaseClient();
   if (!supabase) return;
@@ -209,6 +215,8 @@ export const syncSettingsToCloud = async (settings: {
       sgst_rate: settings.sgstRate,
       packaging_fee: settings.packagingFee,
       seller_info_enabled: settings.sellerInfoEnabled,
+      whatsapp_channel_url: settings.whatsappChannelUrl,
+      show_product_whatsapp: settings.showProductWhatsapp,
       updated_at: new Date().toISOString()
     });
 
@@ -225,6 +233,8 @@ export const pullSettingsFromCloud = async (): Promise<{
   sgstRate: number;
   packagingFee: number;
   sellerInfoEnabled: boolean;
+  whatsappChannelUrl: string;
+  showProductWhatsapp: boolean;
 } | null> => {
   const supabase = getSupabaseClient();
   if (!supabase) return null;
@@ -246,7 +256,9 @@ export const pullSettingsFromCloud = async (): Promise<{
       cgstRate: Number(data.cgst_rate),
       sgstRate: Number(data.sgst_rate),
       packagingFee: Number(data.packaging_fee),
-      sellerInfoEnabled: data.seller_info_enabled
+      sellerInfoEnabled: data.seller_info_enabled,
+      whatsappChannelUrl: data.whatsapp_channel_url || 'https://whatsapp.com/channel/0029VbCSSzBATRSxGKvra03v',
+      showProductWhatsapp: data.show_product_whatsapp !== false
     };
   }
   return null;

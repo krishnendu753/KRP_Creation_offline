@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
-import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize } from './db/db';
+import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize, type ColorVariant } from './db/db';
 import { loginUser, registerUser } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
@@ -113,6 +113,8 @@ export default function App() {
   const [sgstRate, setSgstRate] = useState(() => parseFloat(localStorage.getItem('fee_sgst') || '2.5'));
   const [packagingFee, setPackagingFee] = useState(() => parseFloat(localStorage.getItem('fee_packaging') || '20'));
   const [sellerInfoEnabled, setSellerInfoEnabled] = useState(() => localStorage.getItem('seller_info_enabled') !== 'false');
+  const [whatsappChannelUrl, setWhatsappChannelUrl] = useState(() => localStorage.getItem('whatsapp_channel_url') || 'https://whatsapp.com/channel/0029VbCSSzBATRSxGKvra03v');
+  const [showProductWhatsapp, setShowProductWhatsapp] = useState(() => localStorage.getItem('show_product_whatsapp') !== 'false');
 
   // Payment states
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -129,6 +131,7 @@ export default function App() {
   const [newProductDelivery, setNewProductDelivery] = useState('50');
   const [newProductSafety, setNewProductSafety] = useState('10');
   const [newProductFestival, setNewProductFestival] = useState('');
+  const [newProductWhatsappEnabled, setNewProductWhatsappEnabled] = useState(true);
 
   // Admin states for managing existing products
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -142,6 +145,20 @@ export default function App() {
   const [editProductImage, setEditProductImage] = useState('');
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editWhatsappEnabled, setEditWhatsappEnabled] = useState(true);
+
+  // Color variant state for add/edit forms
+  const [newProductVariants, setNewProductVariants] = useState<ColorVariant[]>([]);
+  const [newVariantName, setNewVariantName] = useState('');
+  const [newVariantHex, setNewVariantHex] = useState('#000000');
+  const [newVariantImage, setNewVariantImage] = useState('');
+  const [editVariants, setEditVariants] = useState<ColorVariant[]>([]);
+  const [editVariantName, setEditVariantName] = useState('');
+  const [editVariantHex, setEditVariantHex] = useState('#000000');
+  const [editVariantImage, setEditVariantImage] = useState('');
+  // Active swatch selection per product (productId → variantId)
+  const [activeVariantMap, setActiveVariantMap] = useState<Record<string, string>>({});
+  const [detailActiveVariant, setDetailActiveVariant] = useState<ColorVariant | null>(null);
   const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState('');
   const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co');
@@ -232,6 +249,14 @@ export default function App() {
           if (count === 0) {
             setIsCatalogSyncing(true);
           }
+
+          // Push any locally-edited products to cloud (offline queue flush)
+          const localProducts = await db.products.toArray();
+          if (localProducts.length > 0) {
+            await Promise.allSettled(localProducts.map(p => syncProductToCloud(p)));
+            console.log(`Flushed ${localProducts.length} locally-cached products to cloud.`);
+          }
+
           const syncedCount = await pullProductsFromCloud();
           if (syncedCount > 0) {
             console.log(`Successfully synchronized ${syncedCount} products from Cloud Database.`);
@@ -252,12 +277,16 @@ export default function App() {
             setSgstRate(sets.sgstRate);
             setPackagingFee(sets.packagingFee);
             setSellerInfoEnabled(sets.sellerInfoEnabled);
+            setWhatsappChannelUrl(sets.whatsappChannelUrl);
+            setShowProductWhatsapp(sets.showProductWhatsapp);
 
             localStorage.setItem('fee_gst_enabled', String(sets.gstEnabled));
             localStorage.setItem('fee_cgst', String(sets.cgstRate));
             localStorage.setItem('fee_sgst', String(sets.sgstRate));
             localStorage.setItem('fee_packaging', String(sets.packagingFee));
             localStorage.setItem('seller_info_enabled', String(sets.sellerInfoEnabled));
+            localStorage.setItem('whatsapp_channel_url', sets.whatsappChannelUrl);
+            localStorage.setItem('show_product_whatsapp', String(sets.showProductWhatsapp));
             console.log("Successfully synchronized shop settings from Cloud Database.");
           }
         })
@@ -319,7 +348,8 @@ export default function App() {
                 isActive: item.is_active,
                 reviews: item.reviews || [],
                 sizes: item.sizes || [],
-                updatedAt: item.updated_at
+                updatedAt: item.updated_at,
+                whatsappEnabled: item.whatsapp_enabled !== false
               };
               await db.products.put(updatedProduct);
               // If the user currently has this product open, update its state live
@@ -340,12 +370,16 @@ export default function App() {
               setSgstRate(Number(sets.sgst_rate));
               setPackagingFee(Number(sets.packaging_fee));
               setSellerInfoEnabled(sets.seller_info_enabled);
+              setWhatsappChannelUrl(sets.whatsapp_channel_url || 'https://whatsapp.com/channel/0029VbCSSzBATRSxGKvra03v');
+              setShowProductWhatsapp(sets.show_product_whatsapp !== false);
 
-              localStorage.setItem('fee_gst_enabled', String(sets.gst_enabled));
+              localStorage.setItem('fee_gst_enabled', String(sets.fee_gst_enabled));
               localStorage.setItem('fee_cgst', String(sets.cgst_rate));
               localStorage.setItem('fee_sgst', String(sets.sgst_rate));
               localStorage.setItem('fee_packaging', String(sets.packaging_fee));
               localStorage.setItem('seller_info_enabled', String(sets.seller_info_enabled));
+              localStorage.setItem('whatsapp_channel_url', sets.whatsapp_channel_url || 'https://whatsapp.com/channel/0029VbCSSzBATRSxGKvra03v');
+              localStorage.setItem('show_product_whatsapp', String(sets.show_product_whatsapp !== false));
             }
           })
           .subscribe();
@@ -808,7 +842,9 @@ export default function App() {
         safetyFee: parseFloat(newProductSafety) || 0,
         isActive: true,
         reviews: [],
-        sizes: [...productSizesInput]
+        sizes: [...productSizesInput],
+        whatsappEnabled: newProductWhatsappEnabled,
+        colorVariants: [...newProductVariants]
       };
       await db.products.add(newProductObj);
       if (isCloudConfigured()) {
@@ -822,6 +858,11 @@ export default function App() {
       setNewProductDelivery('50');
       setNewProductSafety('10');
       setNewProductFestival('');
+      setNewProductWhatsappEnabled(true);
+      setNewProductVariants([]);
+      setNewVariantName('');
+      setNewVariantHex('#000000');
+      setNewVariantImage('');
       setProductSizesInput([
         { size: 'S', length: '36 inches' },
         { size: 'M', length: '38 inches' },
@@ -851,6 +892,7 @@ export default function App() {
       const priceVal = parseFloat(editPrice);
       const nowStr = new Date().toISOString();
 
+      // Save locally first — always works offline
       await db.products.update(editingProductId, {
         name: editName.trim(),
         description: editDesc.trim(),
@@ -865,18 +907,27 @@ export default function App() {
         isActive: editIsActive,
         imageUrl: editProductImage || '',
         sizes: [...productSizesInput],
-        updatedAt: nowStr
+        updatedAt: nowStr,
+        whatsappEnabled: editWhatsappEnabled,
+        colorVariants: [...editVariants]
       });
 
-      if (isCloudConfigured()) {
-        const updatedObj = await db.products.get(editingProductId);
-        if (updatedObj) {
-          await syncProductToCloud(updatedObj);
-        }
-      }
-
-      showToast('Product details updated successfully!', 'success');
       setEditingProductId(null);
+
+      // Sync to cloud only when online
+      if (isOnline && isCloudConfigured()) {
+        try {
+          const updatedObj = await db.products.get(editingProductId);
+          if (updatedObj) {
+            await syncProductToCloud(updatedObj);
+          }
+          showToast('Product updated and synced to cloud!', 'success');
+        } catch (syncErr) {
+          showToast('Product saved locally. Will sync when back online.', 'success');
+        }
+      } else {
+        showToast('Product saved locally. Will sync when back online.', 'success');
+      }
     } catch (err) {
       showToast('Failed to update product details.', 'error');
     } finally {
@@ -889,11 +940,11 @@ export default function App() {
     setIsLoading(true);
     try {
       await db.products.update(productId, { isActive: !currentStatus });
-      if (isCloudConfigured()) {
-        const updated = await db.products.get(productId);
-        if (updated) {
-          await syncProductToCloud(updated);
-        }
+      if (isOnline && isCloudConfigured()) {
+        try {
+          const updated = await db.products.get(productId);
+          if (updated) await syncProductToCloud(updated);
+        } catch (_) { /* sync when back online */ }
       }
       showToast(`Product visibility updated to ${!currentStatus ? 'Active' : 'Inactive'}.`, 'success');
     } catch (err) {
@@ -1037,6 +1088,8 @@ export default function App() {
     localStorage.setItem('fee_sgst', String(sgstRate));
     localStorage.setItem('fee_packaging', String(packagingFee));
     localStorage.setItem('seller_info_enabled', String(sellerInfoEnabled));
+    localStorage.setItem('whatsapp_channel_url', whatsappChannelUrl);
+    localStorage.setItem('show_product_whatsapp', String(showProductWhatsapp));
 
     if (isCloudConfigured()) {
       setIsLoading(true);
@@ -1046,16 +1099,18 @@ export default function App() {
           cgstRate,
           sgstRate,
           packagingFee,
-          sellerInfoEnabled
+          sellerInfoEnabled,
+          whatsappChannelUrl,
+          showProductWhatsapp
         });
-        showToast('Taxes & Packaging configuration synced to Cloud!', 'success');
+        showToast('Settings synced to Cloud!', 'success');
       } catch (err) {
         showToast('Failed to sync configurations to cloud.', 'error');
       } finally {
         setIsLoading(false);
       }
     } else {
-      showToast('Taxes & Packaging configuration updated locally!', 'success');
+      showToast('Settings updated locally!', 'success');
     }
   };
 
@@ -1697,13 +1752,13 @@ export default function App() {
             </div>
 
             {isCatalogSyncing && activeProducts.length === 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-2 md:px-0">
+              <div className="grid grid-cols-3 gap-3 md:gap-6 px-1 md:px-0">
                 {[1, 2, 3].map((n) => (
-                  <div key={n} className="bg-white border border-rose-100/60 rounded-2xl p-4 space-y-4 animate-pulse">
-                    <div className="bg-rose-50/60 h-64 w-full rounded-xl" />
-                    <div className="space-y-3">
-                      <div className="bg-rose-50/60 h-4 w-3/4 rounded" />
-                      <div className="bg-rose-50/60 h-3 w-1/2 rounded" />
+                  <div key={n} className="bg-white border border-rose-100/60 rounded-xl p-3 space-y-3 animate-pulse">
+                    <div className="bg-rose-50/60 h-32 md:h-64 w-full rounded-lg" />
+                    <div className="space-y-2">
+                      <div className="bg-rose-50/60 h-3 w-3/4 rounded" />
+                      <div className="bg-rose-50/60 h-2.5 w-1/2 rounded" />
                     </div>
                   </div>
                 ))}
@@ -1713,7 +1768,7 @@ export default function App() {
                 <p className="text-slate-550">Currently no products match your active filters.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-2 md:px-0">
+              <div className="grid grid-cols-3 gap-3 md:gap-6 px-1 md:px-0">
                 {activeProducts.map((product) => {
                   const onSale = product.discount && product.discount > 0;
                   const discountedPrice = getProductPrice(product);
@@ -1747,95 +1802,149 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="h-72 overflow-hidden bg-rose-50 relative">
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-rose-100 border border-dashed border-rose-200 text-rose-500 font-bold text-xs gap-1">
-                            <span>👗 No Image Available</span>
-                            <span className="text-[10px] text-rose-455 font-normal">KRP Creation</span>
-                          </div>
-                        )}
-                        <span className="absolute top-3 right-3 bg-white/95 text-rose-600 border border-rose-100 text-xs px-2.5 py-1 rounded-full font-semibold shadow-sm">
+                      {/* Product image — switches with active color variant */}
+                      <div className="h-40 sm:h-72 overflow-hidden bg-rose-50 relative">
+                        {(() => {
+                          const activeVId = activeVariantMap[product.id];
+                          const activeV = product.colorVariants?.find(v => v.id === activeVId);
+                          const displayImg = activeV ? activeV.imageUrl : product.imageUrl;
+                          return displayImg ? (
+                            <img
+                              src={displayImg}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-rose-100 border border-dashed border-rose-200 text-rose-500 font-bold text-xs gap-1">
+                              <span>👗 No Image</span>
+                            </div>
+                          );
+                        })()}
+                        <span className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 bg-white/95 text-rose-600 border border-rose-100 text-[8px] sm:text-xs px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full font-semibold shadow-sm">
                           {product.category}
                         </span>
                       </div>
-                      <div className="p-5 flex-1 flex flex-col justify-between">
+
+                      {/* Color variant swatches row */}
+                      {product.colorVariants && product.colorVariants.length > 0 && (
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-white border-t border-rose-50">
+                          {/* Main/default swatch */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setActiveVariantMap(m => ({ ...m, [product.id]: '' })); }}
+                            title="Main color"
+                            className={`w-5 h-5 rounded-full border-2 transition-all ${!activeVariantMap[product.id] ? 'border-rose-500 scale-110 shadow' : 'border-slate-200 hover:border-rose-300'} bg-slate-200 shrink-0`}
+                          />
+                          {product.colorVariants.map(v => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setActiveVariantMap(m => ({ ...m, [product.id]: v.id })); }}
+                              title={v.colorName}
+                              className={`w-5 h-5 rounded-full border-2 transition-all shrink-0 ${activeVariantMap[product.id] === v.id ? 'border-rose-500 scale-110 shadow' : 'border-slate-200 hover:border-rose-300'}`}
+                              style={{ background: v.colorHex || '#ccc' }}
+                            />
+                          ))}
+                          <span className="text-[9px] text-slate-400 ml-auto">
+                            {(() => {
+                              const av = product.colorVariants?.find(v => v.id === activeVariantMap[product.id]);
+                              return av ? av.colorName : 'Main';
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                      <div className="p-2 sm:p-5 flex-1 flex flex-col justify-between">
                         <div>
-                          <div className="flex justify-between items-start gap-2">
-                            <h3 className="font-bold text-lg text-slate-800 group-hover:text-rose-600 transition-colors truncate">
+                          <div className="flex justify-between items-start gap-1">
+                            <h3 className="font-bold text-xs sm:text-lg text-slate-800 group-hover:text-rose-600 transition-colors truncate">
                               {product.name}
                             </h3>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-slate-400">Stock: {product.stock} items</span>
-                            {onSale && (
-                              <span className="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-bold">
-                                {product.discount}% OFF
+                          <div className="flex items-center gap-1.5 mt-0.5 sm:mt-1">
+                            <span className="text-[9px] sm:text-xs text-slate-400">Stock: {product.stock}</span>
+                            {onSale && product.discount > 0 ? (
+                              <span className="text-[8px] sm:text-[10px] bg-rose-100 text-rose-700 px-1 py-0.2 rounded font-bold">
+                                -{product.discount}%
                               </span>
+                            ) : (
+                              <></>
                             )}
                           </div>
 
                           {/* Stars display */}
-                          <div className="flex items-center gap-1 mt-2">
+                          <div className="flex items-center gap-1 mt-1">
                             {avgRating ? (
                               <>
-                                <span className="text-amber-500 font-bold text-xs">★ {avgRating}</span>
-                                <span className="text-slate-400 text-[10px]">({productReviews.length} reviews)</span>
+                                <span className="text-amber-500 font-bold text-[9px] sm:text-xs">★ {avgRating}</span>
+                                <span className="text-slate-400 text-[8px] sm:text-[10px] hidden sm:inline">({productReviews.length})</span>
                               </>
                             ) : (
-                              <span className="text-slate-400 text-[10px]">No reviews yet</span>
+                              <span className="text-slate-400 text-[8px] sm:text-[10px]">No reviews</span>
                             )}
                           </div>
 
-                          <p className="text-sm text-slate-550 mt-2 line-clamp-2">{product.description}</p>
+                          <p className="text-[10px] sm:text-sm text-slate-550 mt-1 line-clamp-1 sm:line-clamp-2">{product.description}</p>
                         </div>
-                        <div className="mt-4 flex items-center justify-between pt-3 border-t border-rose-50/50">
+                        <div className="mt-2 sm:mt-4 flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-rose-50/50 gap-2">
                           <div>
                             {onSale ? (
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-xl font-extrabold text-slate-900">₹{discountedPrice.toFixed(2)}</span>
-                                <span className="text-xs text-slate-400 line-through">₹{product.price.toFixed(2)}</span>
+                              <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2">
+                                <span className="text-sm sm:text-xl font-extrabold text-slate-900">₹{discountedPrice.toFixed(2)}</span>
+                                <span className="text-[9px] sm:text-xs text-slate-400 line-through">₹{product.price.toFixed(2)}</span>
                               </div>
                             ) : (
-                              <span className="text-xl font-extrabold text-slate-900">₹{product.price.toFixed(2)}</span>
+                              <span className="text-sm sm:text-xl font-extrabold text-slate-900">₹{product.price.toFixed(2)}</span>
                             )}
                           </div>
-                          {(() => {
-                            const isInCart = cartItems.some((item) => item.productId === product.id);
-                            if (isInCart) {
+                          <div className="flex gap-1.5 justify-end w-full sm:w-auto mt-1 sm:mt-0">
+                            {showProductWhatsapp && product.whatsappEnabled !== false && (
+                              <a
+                                href={`https://wa.me/917890784816?text=${encodeURIComponent(
+                                  `Hello KRP Creation! I am interested in inquiring about this garment:\n\n👗 *Product Name:* ${product.name}\n💰 *Price:* ₹${discountedPrice.toFixed(2)}\n📂 *Category:* ${product.category}\n\nCan you please share availability and more details?`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] sm:text-xs font-bold p-1.5 sm:p-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-colors shadow-sm text-center flex items-center justify-center"
+                                title="Inquire on WhatsApp"
+                              >
+                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.863-9.764.001-2.614-1.012-5.071-2.853-6.914C16.643 2.086 14.192 1.071 11.997 1.07 6.562 1.07 2.137 5.44 2.135 10.835c-.001 1.701.452 3.361 1.31 4.8l-.946 3.454 3.558-.935zM17.51 14.28c-.297-.15-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                                </svg>
+                              </a>
+                            )}
+                            {(() => {
+                              const isInCart = cartItems.some((item) => item.productId === product.id);
+                              if (isInCart) {
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCurrentPage('cart');
+                                    }}
+                                    className="text-[10px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm text-center shrink-0"
+                                  >
+                                    Go to Cart ➜
+                                  </button>
+                                );
+                              }
                               return (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setCurrentPage('cart');
+                                    handleAddToCart(product);
                                   }}
-                                  className="text-xs font-bold py-2 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
+                                  disabled={isSoldOut}
+                                  className={`text-[10px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-4 rounded-lg transition-colors shadow-sm text-center shrink-0 ${isSoldOut
+                                    ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
+                                    : 'bg-rose-600 hover:bg-rose-500 text-white'
+                                    }`}
                                 >
-                                  Go to Cart ➜
+                                  {isSoldOut ? 'Sold Out' : 'Add to Cart'}
                                 </button>
                               );
-                            }
-                            return (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddToCart(product);
-                                }}
-                                disabled={isSoldOut}
-                                className={`text-xs font-bold py-2 px-4 rounded-lg transition-colors shadow-sm ${isSoldOut
-                                  ? 'bg-slate-300 text-slate-550 cursor-not-allowed'
-                                  : 'bg-rose-600 hover:bg-rose-500 text-white'
-                                  }`}
-                              >
-                                Add to Cart
-                              </button>
-                            );
-                          })()}
+                            })()}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2490,6 +2599,76 @@ export default function App() {
                               </div>
                             </div>
 
+                            {/* Color Variants Section */}
+                            <div className="space-y-2 border-t border-rose-100 pt-3.5 mt-1">
+                              <label className="block text-xs font-bold text-slate-700">Color Variants (Optional)</label>
+                              <p className="text-[10px] text-slate-400">Add multiple color options — each with its own image.</p>
+                              <div className="flex gap-1.5 flex-wrap items-end">
+                                <input
+                                  type="text"
+                                  placeholder="Color name e.g. Red"
+                                  value={newVariantName}
+                                  onChange={(e) => setNewVariantName(e.target.value)}
+                                  className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                                />
+                                <input
+                                  type="color"
+                                  value={newVariantHex}
+                                  onChange={(e) => setNewVariantHex(e.target.value)}
+                                  title="Pick swatch color"
+                                  className="h-9 w-9 rounded-lg border border-rose-100 cursor-pointer p-0.5 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Image URL for this color"
+                                  value={newVariantImage}
+                                  onChange={(e) => setNewVariantImage(e.target.value)}
+                                  className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!newVariantName.trim() || !newVariantImage.trim()) return;
+                                    const v: ColorVariant = {
+                                      id: 'cv_' + Math.random().toString(36).substr(2, 8),
+                                      colorName: newVariantName.trim(),
+                                      colorHex: newVariantHex,
+                                      imageUrl: newVariantImage.trim()
+                                    };
+                                    setNewProductVariants(prev => [...prev, v]);
+                                    setNewVariantName('');
+                                    setNewVariantImage('');
+                                  }}
+                                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-2 rounded-lg shrink-0"
+                                >+ Add</button>
+                              </div>
+                              {newProductVariants.length > 0 && (
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                  {newProductVariants.map(v => (
+                                    <div key={v.id} className="flex items-center gap-1.5 bg-white border border-rose-100 rounded-full px-2.5 py-1 text-[10px] font-medium shadow-sm">
+                                      <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ background: v.colorHex || '#ccc' }} />
+                                      <span className="text-slate-700">{v.colorName}</span>
+                                      <button type="button" onClick={() => setNewProductVariants(prev => prev.filter(x => x.id !== v.id))} className="text-rose-400 hover:text-rose-600 font-bold ml-0.5">✕</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* WhatsApp toggle option */}
+                            <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60 my-3 text-xs">
+                              <input
+                                type="checkbox"
+                                id="newProductWhatsappToggle"
+                                checked={newProductWhatsappEnabled}
+                                onChange={(e) => setNewProductWhatsappEnabled(e.target.checked)}
+                                className="accent-rose-600 h-4 w-4 cursor-pointer"
+                              />
+                              <label htmlFor="newProductWhatsappToggle" className="text-slate-700 font-bold cursor-pointer">
+                                Enable WhatsApp Inquiry for this Product
+                              </label>
+                            </div>
+
                             <button
                               type="submit"
                               className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg transition-colors shadow-sm"
@@ -2569,8 +2748,14 @@ export default function App() {
                                       setEditDeliveryCharge(String(prod.deliveryCharge || 0));
                                       setEditSafetyFee(String(prod.safetyFee || 0));
                                       setEditIsActive(prod.isActive !== false);
+                                      setEditWhatsappEnabled(prod.whatsappEnabled !== false);
                                       setEditProductImage(prod.imageUrl || '');
                                       setProductSizesInput(prod.sizes || []);
+                                      setEditVariants(prod.colorVariants || []);
+                                      setEditVariantName('');
+                                      setEditVariantHex('#000000');
+                                      setEditVariantImage('');
+                                      setDetailActiveVariant(null);
                                     }}
                                     className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded font-semibold"
                                   >
@@ -3031,6 +3216,35 @@ export default function App() {
                             </label>
                           </div>
 
+                          {/* WhatsApp Channel Config */}
+                          <div className="border-t border-rose-100 pt-3 mt-3 space-y-3">
+                            {/* <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">WhatsApp Configuration</h4>
+
+                            <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-lg border border-rose-100/60">
+                              <input
+                                type="checkbox"
+                                id="whatsappProductToggle"
+                                checked={showProductWhatsapp}
+                                onChange={(e) => setShowProductWhatsapp(e.target.checked)}
+                                className="accent-rose-650 cursor-pointer h-4 w-4"
+                              />
+                              <label htmlFor="whatsappProductToggle" className="text-slate-705 font-bold cursor-pointer">
+                                Display WhatsApp Inquiry Button on each Product
+                              </label>
+                            </div> */}
+
+                            <div>
+                              <label className="block text-slate-500 mb-1">WhatsApp Channel / Redirect Link</label>
+                              <input
+                                type="url"
+                                value={whatsappChannelUrl}
+                                onChange={(e) => setWhatsappChannelUrl(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                                placeholder="https://whatsapp.com/channel/..."
+                              />
+                            </div>
+                          </div>
+
                           <button
                             type="submit"
                             className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg transition-colors shadow-sm text-[11px]"
@@ -3485,6 +3699,7 @@ export default function App() {
                 setSelectedProduct(null);
                 setReviewComment('');
                 setReviewRating(5);
+                setDetailActiveVariant(null);
               }}
               className="absolute top-3 right-3 z-10 bg-white/90 hover:bg-rose-50 text-rose-600 w-8 h-8 rounded-full flex items-center justify-center font-bold border border-rose-100 transition-colors shadow-sm"
             >
@@ -3493,16 +3708,49 @@ export default function App() {
 
             <div className="overflow-y-auto p-6 space-y-5">
               <div className="flex flex-col sm:flex-row gap-5">
-                <div className="w-full sm:w-1/2 h-56 bg-rose-50 rounded-xl overflow-hidden border border-rose-100 shrink-0">
-                  {selectedProduct.imageUrl ? (
-                    <img
-                      src={selectedProduct.imageUrl}
-                      alt={selectedProduct.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-rose-100 border border-dashed border-rose-250 text-rose-505 font-bold text-sm gap-1">
-                      <span>👗 No Image Available</span>
+                <div className="w-full sm:w-1/2 shrink-0 space-y-2">
+                  <div className="h-56 bg-rose-50 rounded-xl overflow-hidden border border-rose-100">
+                    {(() => {
+                      const displayImg = detailActiveVariant ? detailActiveVariant.imageUrl : selectedProduct.imageUrl;
+                      return displayImg ? (
+                        <img
+                          src={displayImg}
+                          alt={selectedProduct.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-rose-100 border border-dashed border-rose-250 text-rose-505 font-bold text-sm gap-1">
+                          <span>👗 No Image Available</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  {/* Color variant swatches in detail modal */}
+                  {selectedProduct.colorVariants && selectedProduct.colorVariants.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Color Options</p>
+                      <div className="flex flex-wrap gap-2">
+                        {/* Main default */}
+                        <button
+                          type="button"
+                          onClick={() => setDetailActiveVariant(null)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold transition-all ${!detailActiveVariant ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-rose-100 bg-white text-slate-600 hover:border-rose-300'}`}
+                        >
+                          <span className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" />
+                          Main
+                        </button>
+                        {selectedProduct.colorVariants.map(v => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => setDetailActiveVariant(v)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold transition-all ${detailActiveVariant?.id === v.id ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-rose-100 bg-white text-slate-600 hover:border-rose-300'}`}
+                          >
+                            <span className="w-3.5 h-3.5 rounded-full shrink-0 border border-slate-200" style={{ background: v.colorHex || '#ccc' }} />
+                            {v.colorName}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3950,6 +4198,62 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Color Variants Editor */}
+                <div className="space-y-2 border-t border-rose-100 pt-3.5 mt-1">
+                  <label className="block text-xs font-bold text-slate-700">Color Variants</label>
+                  <p className="text-[10px] text-slate-400">Add color options for this product — each with its own image.</p>
+                  <div className="flex gap-1.5 flex-wrap items-end">
+                    <input
+                      type="text"
+                      placeholder="Color name e.g. Blue"
+                      value={editVariantName}
+                      onChange={(e) => setEditVariantName(e.target.value)}
+                      className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                    />
+                    <input
+                      type="color"
+                      value={editVariantHex}
+                      onChange={(e) => setEditVariantHex(e.target.value)}
+                      title="Pick swatch color"
+                      className="h-9 w-9 rounded-lg border border-rose-100 cursor-pointer p-0.5 shrink-0"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Image URL for this color"
+                      value={editVariantImage}
+                      onChange={(e) => setEditVariantImage(e.target.value)}
+                      className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!editVariantName.trim() || !editVariantImage.trim()) return;
+                        const v: ColorVariant = {
+                          id: 'cv_' + Math.random().toString(36).substr(2, 8),
+                          colorName: editVariantName.trim(),
+                          colorHex: editVariantHex,
+                          imageUrl: editVariantImage.trim()
+                        };
+                        setEditVariants(prev => [...prev, v]);
+                        setEditVariantName('');
+                        setEditVariantImage('');
+                      }}
+                      className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-2 rounded-lg shrink-0"
+                    >+ Add</button>
+                  </div>
+                  {editVariants.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {editVariants.map(v => (
+                        <div key={v.id} className="flex items-center gap-1.5 bg-white border border-rose-100 rounded-full px-2.5 py-1 text-[10px] font-medium shadow-sm">
+                          <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ background: v.colorHex || '#ccc' }} />
+                          <span className="text-slate-700">{v.colorName}</span>
+                          <button type="button" onClick={() => setEditVariants(prev => prev.filter(x => x.id !== v.id))} className="text-rose-400 hover:text-rose-600 font-bold ml-0.5">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-3.5 border-t border-rose-50 pt-4 mt-1">
                   <div className="flex items-center gap-2.5">
                     <input
@@ -3961,6 +4265,18 @@ export default function App() {
                     />
                     <label htmlFor="editActive" className="text-slate-700 font-bold cursor-pointer text-xs">
                       Product is Active (Visible to Customers)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="editWhatsappToggle"
+                      checked={editWhatsappEnabled}
+                      onChange={(e) => setEditWhatsappEnabled(e.target.checked)}
+                      className="accent-rose-600 h-4 w-4 cursor-pointer"
+                    />
+                    <label htmlFor="editWhatsappToggle" className="text-slate-700 font-bold cursor-pointer text-xs">
+                      Enable WhatsApp Inquiry for this Product
                     </label>
                   </div>
                 </div>
@@ -4137,6 +4453,19 @@ export default function App() {
       <footer className="bg-white border-t border-rose-100 text-center py-4 text-xs text-slate-400 shadow-inner mt-6 print:hidden">
         © {new Date().getFullYear()} KRP Creation. All local browser states are persisted.
       </footer>
+
+      {/* Floating WhatsApp Action Button */}
+      <a
+        href={whatsappChannelUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-40 bg-emerald-500 hover:bg-emerald-600 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer border border-emerald-400 hover:shadow-emerald-500/30 print:hidden"
+        title="Join WhatsApp Channel"
+      >
+        <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.863-9.764.001-2.614-1.012-5.071-2.853-6.914C16.643 2.086 14.192 1.071 11.997 1.07 6.562 1.07 2.137 5.44 2.135 10.835c-.001 1.701.452 3.361 1.31 4.8l-.946 3.454 3.558-.935zM17.51 14.28c-.297-.15-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+        </svg>
+      </a>
     </div>
   );
 }

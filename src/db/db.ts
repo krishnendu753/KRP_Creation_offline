@@ -13,6 +13,15 @@ export interface ProductSize {
   length: string; // e.g. "38 inches", "42 inches", "N/A"
 }
 
+export interface ColorVariant {
+  id: string;        // Unique ID e.g. "cv_abc123"
+  colorName: string; // e.g. "Red", "Navy Blue"
+  colorHex?: string; // Optional hex code for swatch circle e.g. "#FF0000"
+  imageUrl: string;  // Image URL specific to this color
+  stock?: number;    // Optional per-variant stock override
+  price?: number;    // Optional per-variant price override
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -21,15 +30,17 @@ export interface Product {
   imageUrl: string;
   category: string;
   stock: number;
-  discount?: number; // Discount percentage (e.g., 10 for 10% off)
-  isFestiveDiscount?: boolean; // True if active
-  festiveName?: string; // Specific Indian Festival name
-  deliveryCharge?: number; // Product-specific delivery charge
-  safetyFee?: number; // Product-specific safety fee
-  isActive?: boolean; // Active/Inactive toggle
+  discount?: number;
+  isFestiveDiscount?: boolean;
+  festiveName?: string;
+  deliveryCharge?: number;
+  safetyFee?: number;
+  isActive?: boolean;
   reviews?: Array<{ reviewerName: string; rating: number; comment: string; createdAt: number }>;
-  sizes?: ProductSize[]; // List of available sizes and their lengths
-  updatedAt?: string; // Last updated timestamp
+  sizes?: ProductSize[];
+  updatedAt?: string;
+  whatsappEnabled?: boolean;
+  colorVariants?: ColorVariant[]; // Sub-catalog color variants
 }
 
 export interface CartItem {
