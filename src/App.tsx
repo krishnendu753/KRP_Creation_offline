@@ -3906,22 +3906,36 @@ onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
             {/* Copy UPI ID card */}
             <div className="bg-rose-50/55 border border-rose-100 p-2 rounded-xl mb-3 text-xs space-y-1.5 text-left">
               <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold text-center">Payment UPI ID</div>
-              <div className="flex gap-2">
-                <a
-                  href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL`}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold py-1.5 rounded transition-colors text-center flex items-center justify-center gap-0.5"
-                >
-                  ⚡ Pay Directly
-                </a>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex gap-1 justify-center">
+                  <a
+                    href="phonepe://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL"
+                    className="flex-1 bg-violet-600 hover:bg-violet-750 text-white text-[8px] font-bold py-1 rounded transition-colors text-center flex items-center justify-center gap-0.5"
+                  >
+                    🟣 PhonePe
+                  </a>
+                  <a
+                    href="gpay://upi/pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL"
+                    className="flex-1 bg-blue-600 hover:bg-blue-750 text-white text-[8px] font-bold py-1 rounded transition-colors text-center flex items-center justify-center gap-0.5"
+                  >
+                    🔵 GPay
+                  </a>
+                  <a
+                    href="paytmmp://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL"
+                    className="flex-1 bg-cyan-600 hover:bg-cyan-750 text-white text-[8px] font-bold py-1 rounded transition-colors text-center flex items-center justify-center gap-0.5"
+                  >
+                    🟢 Paytm
+                  </a>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText('7890784816-3@ybl');
                     showToast('UPI ID copied to clipboard!', 'success');
                   }}
-                  className="bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 flex items-center gap-0.5"
+                  className="w-full bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-bold py-1 rounded transition-colors flex items-center justify-center gap-0.5"
                 >
-                  📋 Copy ID
+                  📋 Copy UPI ID: 7890784816-3@ybl
                 </button>
               </div>
               <div className="text-[8px] text-amber-700 font-semibold text-center bg-amber-50 p-1 rounded border border-amber-100">
