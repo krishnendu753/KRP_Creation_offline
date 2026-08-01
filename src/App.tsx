@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
-import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize, type ColorVariant } from './db/db';
+import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize, type ColorVariant, type Category } from './db/db';
 import { loginUser, registerUser } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
@@ -20,7 +20,10 @@ import {
   pullAnnouncementsFromCloud,
   syncEventToCloud,
   deleteEventFromCloud,
-  pullEventsFromCloud
+  pullEventsFromCloud,
+  syncCategoryToCloud,
+  deleteCategoryFromCloud,
+  pullCategoriesFromCloud
 } from './services/supabase';
 
 type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
@@ -198,9 +201,16 @@ export default function App() {
   const [eventLink, setEventLink] = useState('');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
-  // Admin Dashboard Active Tab State
-  // tabs: 'inventory' | 'orders' | 'announcements' | 'events' | 'settings'
-  const [adminActiveTab, setAdminActiveTab] = useState<'inventory' | 'orders' | 'announcements' | 'events' | 'settings'>('inventory');
+   // Admin Dashboard Active Tab State
+  // tabs: 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'
+  const [adminActiveTab, setAdminActiveTab] = useState<'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'>('inventory');
+
+  // Admin Categories state
+  const [categoryNameInput, setCategoryNameInput] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [categoryToDeleteId, setCategoryToDeleteId] = useState<string | null>(null);
+
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -223,6 +233,7 @@ export default function App() {
   const allOrders = useLiveQuery(() => db.orders.toArray()) || [];
   const announcementsList = useLiveQuery(() => db.announcements.toArray()) || [];
   const eventsList = useLiveQuery(() => db.events.toArray()) || [];
+  const categoriesList = useLiveQuery(() => db.categories.toArray()) || [];
 
   // Automatically redirect based on user authentication state (Allowing 'home' tab view first)
   useEffect(() => {
@@ -232,6 +243,14 @@ export default function App() {
     setCurrentPage('home');
     //}
   }, [user]);
+
+  // Safeguard: Preselect first valid database category if selected one is removed or uninitialized
+  useEffect(() => {
+    if (categoriesList.length > 0 && !categoriesList.some(c => c.name === newProductCategory)) {
+      setNewProductCategory(categoriesList[0].name);
+    }
+  }, [categoriesList, newProductCategory]);
+
 
   // Prepopulate Announcements admin inputs when announcementsList loads
   useEffect(() => {
@@ -313,14 +332,20 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Cloud announcements sync failed: ", err);
-        });
-
-      pullEventsFromCloud()
+        });      pullEventsFromCloud()
         .then((count) => {
           console.log(`Successfully synchronized ${count} events from Cloud Database.`);
         })
         .catch((err) => {
           console.error("Cloud events sync failed: ", err);
+        });
+
+      pullCategoriesFromCloud()
+        .then((count) => {
+          console.log(`Successfully synchronized ${count} categories from Cloud Database.`);
+        })
+        .catch((err) => {
+          console.error("Cloud categories sync failed: ", err);
         });
 
       // Subscribe to live database updates (Supabase Realtime)
@@ -351,7 +376,7 @@ export default function App() {
                 isActive: item.is_active,
                 reviews: item.reviews || [],
                 sizes: item.sizes || [],
-                colorVariants: item.color_variants || [],
+                color_variants: item.color_variants || [],
                 updatedAt: item.updated_at,
                 whatsappEnabled: item.whatsapp_enabled !== false
               };
@@ -380,7 +405,7 @@ export default function App() {
               localStorage.setItem('fee_gst_enabled', String(sets.fee_gst_enabled));
               localStorage.setItem('fee_cgst', String(sets.cgst_rate));
               localStorage.setItem('fee_sgst', String(sets.sgst_rate));
-              localStorage.setItem('fee_packaging', String(sets.packaging_fee));
+              localStorage.setItem('fee_packaging', String(sets.fee_packaging));
               localStorage.setItem('seller_info_enabled', String(sets.seller_info_enabled));
               localStorage.setItem('whatsapp_channel_url', sets.whatsapp_channel_url || 'https://whatsapp.com/channel/0029VbCSSzBATRSxGKvra03v');
               localStorage.setItem('show_product_whatsapp', String(sets.show_product_whatsapp !== false));
@@ -526,12 +551,31 @@ export default function App() {
           })
           .subscribe();
 
+        // Categories realtime subscription
+        const categoriesChannel = supabase
+          .channel('realtime-categories')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, async (payload) => {
+            console.log('Realtime category change: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.categories.delete(payload.old.id);
+            } else {
+              const item = payload.new;
+              await db.categories.put({
+                id: item.id,
+                name: item.name,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
+          })
+          .subscribe();
+
         return () => {
           supabase.removeChannel(productsChannel);
           supabase.removeChannel(settingsChannel);
           supabase.removeChannel(ordersChannel);
           supabase.removeChannel(announcementsChannel);
           supabase.removeChannel(eventsChannel);
+          supabase.removeChannel(categoriesChannel);
         };
       }
     }
@@ -1264,6 +1308,91 @@ export default function App() {
       setIsLoading(false);
     }
   };
+
+  // Admin add category
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryNameInput.trim()) {
+      showToast('Category name cannot be empty.', 'error');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const catId = 'cat_' + categoryNameInput.trim().toLowerCase().replace(/\s+/g, '_');
+      // Check if category already exists
+      const existing = await db.categories.get(catId);
+      if (existing) {
+        showToast('A category with this name already exists.', 'error');
+        setIsLoading(false);
+        return;
+      }
+
+      const newCat: Category = {
+        id: catId,
+        name: categoryNameInput.trim(),
+        createdAt: Date.now()
+      };
+      await db.categories.add(newCat);
+      if (isCloudConfigured()) {
+        await syncCategoryToCloud(newCat);
+      }
+      showToast('Category added successfully!', 'success');
+      setCategoryNameInput('');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to add category.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin update category name
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategoryId || !editingCategoryName.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const catObj = await db.categories.get(editingCategoryId);
+      if (catObj) {
+        const updatedCat = {
+          ...catObj,
+          name: editingCategoryName.trim()
+        };
+        await db.categories.put(updatedCat);
+        if (isCloudConfigured()) {
+          await syncCategoryToCloud(updatedCat);
+        }
+        showToast('Category updated successfully!', 'success');
+      }
+      setEditingCategoryId(null);
+      setEditingCategoryName('');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update category.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin delete category
+  const handleDeleteCategory = async (catId: string) => {
+    setIsLoading(true);
+    try {
+      await db.categories.delete(catId);
+      if (isCloudConfigured()) {
+        await deleteCategoryFromCloud(catId);
+      }
+      showToast('Category deleted successfully.', 'success');
+      setCategoryToDeleteId(null);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete category.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   // Print invoice handler
   const handlePrintInvoice = () => {
@@ -2510,6 +2639,15 @@ export default function App() {
                     📅 Scheduled Events
                   </button>
                   <button
+                    onClick={() => setAdminActiveTab('categories')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'categories'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    🏷️ Product Categories
+                  </button>
+                  <button
                     onClick={() => setAdminActiveTab('settings')}
                     className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'settings'
                       ? 'bg-rose-600 text-white shadow-md'
@@ -2594,14 +2732,9 @@ export default function App() {
                                   onChange={(e) => setNewProductCategory(e.target.value)}
                                   className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
                                 >
-                                  <option value="Saree">Saree</option>
-                                  <option value="Dress">Dress</option>
-                                  <option value="Kurti">Kurti</option>
-                                  <option value="Salwar Suit">Salwar Suit</option>
-                                  <option value="Jackets">Jackets</option>
-                                  <option value="pencil pants">pencil pants</option>
-                                  <option value="palazzo pants">palazzo pants</option>
-                                  <option value="pants">pants</option>
+                                  {categoriesList.map(cat => (
+                                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                  ))}
                                 </select>
                               </div>
 
@@ -3302,6 +3435,113 @@ export default function App() {
                             </div>
                           )}
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PRODUCT CATEGORIES MANAGEMENT TAB */}
+                  {adminActiveTab === 'categories' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Left: Create / Edit Category Form */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4 h-fit">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">
+                          {editingCategoryId ? 'Edit Category' : 'Create New Category'}
+                        </h3>
+                        
+                        {editingCategoryId ? (
+                          <form onSubmit={handleUpdateCategory} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Category Name</label>
+                              <input
+                                type="text"
+                                required
+                                value={editingCategoryName}
+                                onChange={(e) => setEditingCategoryName(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="submit"
+                                className="bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 px-4 rounded-lg shadow-sm"
+                              >
+                                Save Changes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCategoryId(null);
+                                  setEditingCategoryName('');
+                                }}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleAddCategory} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Category Name</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Saree, Kurti, Palazzo pants"
+                                value={categoryNameInput}
+                                onChange={(e) => setCategoryNameInput(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              className="bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 px-4 rounded-lg shadow-sm"
+                            >
+                              + Create Category
+                            </button>
+                          </form>
+                        )}
+                      </div>
+
+                      {/* Right: Category List */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">
+                          Existing Categories ({categoriesList.length})
+                        </h3>
+
+                        {categoriesList.length === 0 ? (
+                          <p className="text-slate-400 text-xs italic">No categories stored in the database.</p>
+                        ) : (
+                          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                            {categoriesList.map((cat) => (
+                              <div
+                                key={cat.id}
+                                className="flex justify-between items-center bg-rose-50/20 border border-rose-100/60 p-3 rounded-xl text-xs"
+                              >
+                                <div>
+                                  <span className="font-bold text-slate-800 text-sm">{cat.name}</span>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">ID: {cat.id}</div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingCategoryId(cat.id);
+                                      setEditingCategoryName(cat.name);
+                                    }}
+                                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => setCategoryToDeleteId(cat.id)}
+                                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-2.5 py-1 rounded transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -4302,14 +4542,9 @@ export default function App() {
                     onChange={(e) => setEditCategory(e.target.value)}
                     className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                   >
-                    <option value="Saree">Saree</option>
-                    <option value="Dress">Dress</option>
-                    <option value="Kurti">Kurti</option>
-                    <option value="Salwar Suit">Salwar Suit</option>
-                    <option value="Jackets">Jackets</option>
-                    <option value="pencil pants">pencil pants</option>
-                    <option value="palazzo pants">palazzo pants</option>
-                    <option value="pants">pants</option>
+                    {categoriesList.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -4625,6 +4860,42 @@ export default function App() {
           </div>
         </div>
       )}
+
+
+      {/* Delete Category Confirmation Modal */}
+      {categoryToDeleteId && (() => {
+        const catToDelete = categoriesList.find(c => c.id === categoryToDeleteId);
+        return (
+          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm print:hidden">
+            <div className="bg-white border border-red-200 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800">
+              <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center mx-auto mb-4 text-2xl">
+                🗑
+              </div>
+              <h3 className="text-lg font-bold font-serif mb-1 text-slate-800 text-center">Delete Category?</h3>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed text-center">
+                Are you sure you want to delete the category <strong className="text-rose-600">"{catToDelete?.name}"</strong>? 
+                Products using this category will remain, but they won't belong to a valid category.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCategoryToDeleteId(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteCategory(categoryToDeleteId)}
+                  disabled={isLoading}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm transition-colors shadow-md disabled:opacity-50"
+                >
+                  {isLoading ? 'Deleting...' : '🗑 Confirm Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete Order Confirmation Modal */}
       {deletingOrderId && (() => {

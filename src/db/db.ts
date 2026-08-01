@@ -112,6 +112,7 @@ class OfflineEcommerceDB extends Dexie {
   orders!: Table<Order, number>;
   announcements!: Table<Announcement, string>;
   events!: Table<EventItem, string>;
+  categories!: Table<Category, string>;
 
   constructor() {
     super('OfflineEcommerceDB');
@@ -131,14 +132,46 @@ class OfflineEcommerceDB extends Dexie {
       announcements: 'id',
       events: 'id, eventDate'
     });
+
+    // Version 4: Add categories table for dynamic admin categories
+    this.version(4).stores({
+      users: '++id, &phone',
+      products: 'id, category',
+      cart: '++id, productId',
+      orders: '++id, status, receiptId',
+      announcements: 'id',
+      events: 'id, eventDate',
+      categories: 'id, name'
+    });
   }
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  createdAt: number;
 }
 
 export const db = new OfflineEcommerceDB();
 
 // Clean up legacy products and delete default items on startup
 db.open().then(async () => {
-  const allowedCategories = ['Saree', 'Dress', 'Kurti', 'Salwar Suit', 'Jackets', 'pencil pants', 'palazzo pants', 'pants'];
+  // Pre-populate default categories if categories table is empty
+  const defaultCategories = ['Saree', 'Dress', 'Kurti', 'Salwar Suit', 'Jackets', 'pencil pants', 'palazzo pants', 'pants'];
+  const existingCategoriesCount = await db.categories.count();
+  if (existingCategoriesCount === 0) {
+    const categoriesToInsert = defaultCategories.map(cat => ({
+      id: 'cat_' + cat.toLowerCase().replace(/\s+/g, '_'),
+      name: cat,
+      createdAt: Date.now()
+    }));
+    await db.categories.bulkPut(categoriesToInsert);
+    console.log("Pre-populated default categories in database.");
+  }
+
+  const allowedCategoriesList = await db.categories.toArray();
+  const allowedCategories = allowedCategoriesList.map(c => c.name);
+
   const allProds = await db.products.toArray();
   
   // Delete legacy products

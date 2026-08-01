@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { db, type Product, type Order, type Announcement, type EventItem } from '../db/db';
+import { db, type Product, type Order, type Announcement, type EventItem, type Category } from '../db/db';
 
 const DEFAULT_SUPABASE_URL = 'https://ggbevhaudwhbpevjbdhq.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI';
@@ -383,3 +383,65 @@ export const pullEventsFromCloud = async (): Promise<number> => {
   }
   return 0;
 };
+
+// Sync category to cloud
+export const syncCategoryToCloud = async (cat: Category) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('categories')
+    .upsert({
+      id: cat.id,
+      name: cat.name,
+      created_at: new Date(cat.createdAt).toISOString()
+    });
+
+  if (error) {
+    console.error("Failed to sync category to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Delete category from cloud
+export const deleteCategoryFromCloud = async (catId: string) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', catId);
+
+  if (error) {
+    console.error("Failed to delete category from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Pull all categories from cloud
+export const pullCategoriesFromCloud = async (): Promise<number> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*');
+
+  if (error) {
+    console.error("Failed to pull categories from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data && data.length > 0) {
+    const formatted = data.map(item => ({
+      id: item.id,
+      name: item.name,
+      createdAt: new Date(item.created_at).getTime()
+    }));
+    await db.categories.bulkPut(formatted);
+    return data.length;
+  }
+  return 0;
+};
+
