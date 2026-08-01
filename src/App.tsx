@@ -169,6 +169,7 @@ export default function App() {
   const [rejectionReasonText, setRejectionReasonText] = useState('');
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   const [cancellationReasonText, setCancellationReasonText] = useState('');
+  const [deletingOrderId, setDeletingOrderId] = useState<number | null>(null);
   const [readOrderIds, setReadOrderIds] = useState<string[]>(() => JSON.parse(localStorage.getItem('admin_read_order_ids') || '[]'));
 
   // Sizes creation states (Admin input fields)
@@ -1026,6 +1027,32 @@ export default function App() {
       showToast('Failed to reject order.', 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Admin Delete Order handler
+  const handleDeleteOrder = async (orderId: number) => {
+    setIsLoading(true);
+    try {
+      const orderObj = await db.orders.get(orderId);
+      await db.orders.delete(orderId);
+      // Also remove from cloud if configured
+      if (isOnline && isCloudConfigured() && orderObj?.receiptId) {
+        try {
+          const supabase = getSupabaseClient();
+          if (supabase) {
+            await supabase.from('orders').delete().eq('receipt_id', orderObj.receiptId);
+          }
+        } catch (syncErr) {
+          console.error('Cloud order delete failed:', syncErr);
+        }
+      }
+      showToast('Order record deleted successfully.', 'success');
+    } catch (err) {
+      showToast('Failed to delete order record.', 'error');
+    } finally {
+      setIsLoading(false);
+      setDeletingOrderId(null);
     }
   };
 
@@ -2965,6 +2992,15 @@ export default function App() {
                                       Reject
                                     </button>
                                   )}
+                                  {/* Delete button: only for approved (delivered) and rejected orders */}
+                                  {(order.status === 'approved' || order.status === 'rejected') && (
+                                    <button
+                                      onClick={() => setDeletingOrderId(order.id!)}
+                                      className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs px-2.5 py-0.5 rounded border border-red-200 transition-colors"
+                                    >
+                                      🗑 Delete
+                                    </button>
+                                  )}
                                   <span
                                     className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
                                       order.status === 'approved'
@@ -4589,6 +4625,64 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Delete Order Confirmation Modal */}
+      {deletingOrderId && (() => {
+        const orderToDelete = allOrders.find(o => o.id === deletingOrderId);
+        return (
+          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm print:hidden">
+            <div className="bg-white border border-red-200 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800">
+              {/* Warning icon */}
+              <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center mx-auto mb-4 text-2xl">
+                🗑
+              </div>
+              <h3 className="text-lg font-bold font-serif mb-1 text-slate-800 text-center">Delete Order Record?</h3>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed text-center">
+                This will permanently remove the order record from the database. This action <strong className="text-red-600">cannot be undone</strong>.
+              </p>
+
+              {orderToDelete && (
+                <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-5 space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-700">
+                    <span className="text-slate-500 font-semibold">Order Ref:</span>
+                    <span className="font-bold font-mono">{orderToDelete.receiptId || `KRP-${orderToDelete.id}`}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-700">
+                    <span className="text-slate-500 font-semibold">Customer:</span>
+                    <span className="font-bold">{orderToDelete.shippingInfo?.fullName || '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-700">
+                    <span className="text-slate-500 font-semibold">Amount:</span>
+                    <span className="font-bold text-rose-600">₹{orderToDelete.totalAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-700">
+                    <span className="text-slate-500 font-semibold">Status:</span>
+                    <span className={`font-bold ${orderToDelete.status === 'approved' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {orderToDelete.status === 'approved' ? '✓ Delivered' : 'Rejected'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeletingOrderId(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteOrder(deletingOrderId)}
+                  disabled={isLoading}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm transition-colors shadow-md disabled:opacity-50"
+                >
+                  {isLoading ? 'Deleting...' : '🗑 Confirm Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Custom Order Rejection Explanation Modal */}
       {rejectingOrderId && (
