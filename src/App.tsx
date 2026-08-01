@@ -119,6 +119,7 @@ export default function App() {
   // Payment states
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [pendingApprovalOrder, setPendingApprovalOrder] = useState<Order | null>(null);
 
   // Bill/Receipt states
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
@@ -692,11 +693,10 @@ export default function App() {
         (netSubtotal + cgstVal + sgstVal + totalDeliverySum + packagingFee + totalSafetySum).toFixed(2)
       );
 
-      const orderStatus = isOnline ? 'synced' : 'pending_sync';
       const orderData: Omit<Order, 'id'> = {
         items: orderItems,
         totalAmount: finalGrandTotal,
-        status: orderStatus,
+        status: 'payment_pending', // Always starts pending — admin must approve after verifying payment
         shippingInfo: {
           fullName: shipName.trim(),
           phone: shipPhone.trim(),
@@ -726,7 +726,7 @@ export default function App() {
       setIsPaymentOpen(false);
       setPaymentConfirmed(false);
 
-      // Save shipping fields
+      // Reset shipping fields
       setShipAddress('');
       setShipCountry('India');
       setShipState('');
@@ -734,7 +734,8 @@ export default function App() {
       setShipPincode('');
 
       if (createdOrder) {
-        setActiveReceiptOrder(createdOrder);
+        // Show awaiting approval screen (NOT the receipt — admin must approve first)
+        setPendingApprovalOrder(createdOrder);
         if (isOnline && isCloudConfigured()) {
           try {
             await syncOrdersToCloud([createdOrder]);
@@ -744,11 +745,7 @@ export default function App() {
         }
       }
 
-      if (isOnline) {
-        showToast('Payment confirmed and order placed online!', 'success');
-      } else {
-        showToast('Currently offline. Payment confirmed and order queued locally.', 'info');
-      }
+      showToast('Order submitted! Awaiting admin payment verification.', 'info');
     } catch (err) {
       showToast('Order placement failed.', 'error');
     } finally {
@@ -981,6 +978,25 @@ export default function App() {
     } finally {
       setIsLoading(false);
       setProductToDeleteId(null);
+    }
+  };
+
+  // Admin Approve Order handler (verifies payment manually and unlocks receipt for customer)
+  const handleApproveOrder = async (orderId: number) => {
+    setIsLoading(true);
+    try {
+      await db.orders.update(orderId, { status: 'approved' });
+      if (isOnline && isCloudConfigured()) {
+        const orderObj = await db.orders.get(orderId);
+        if (orderObj) {
+          await syncOrdersToCloud([orderObj]);
+        }
+      }
+      showToast('Order approved! Customer can now view their receipt.', 'success');
+    } catch (err) {
+      showToast('Failed to approve order.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -2157,14 +2173,17 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => setActiveReceiptOrder(order)}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-rose-200 transition-colors"
-                        >
-                          View / Print Receipt Bill
-                        </button>
-                        {/* Cancel button: only for synced orders not yet cancelled/rejected */}
-                        {(order.status === 'synced' || order.status === 'pending_sync') && (
+                        {/* View Receipt: only after admin approval */}
+                        {(order.status === 'approved') && (
+                          <button
+                            onClick={() => setActiveReceiptOrder(order)}
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-emerald-200 transition-colors"
+                          >
+                            ✓ View / Print Receipt
+                          </button>
+                        )}
+                        {/* Cancel button: only for approved/synced orders not yet cancelled/rejected */}
+                        {(order.status === 'approved' || order.status === 'synced' || order.status === 'pending_sync') && (
                           <button
                             onClick={() => setCancellingOrderId(order.id!)}
                             className="bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-slate-200 transition-colors"
@@ -2173,16 +2192,28 @@ export default function App() {
                           </button>
                         )}
                         <span
-                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'synced'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : order.status === 'rejected'
-                              ? 'bg-rose-50 text-rose-750 border-rose-200'
-                              : order.status === 'cancelled'
-                                ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
+                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${
+                            order.status === 'approved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : order.status === 'synced'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : order.status === 'rejected'
+                                  ? 'bg-rose-50 text-rose-750 border-rose-200'
+                                  : order.status === 'cancelled'
+                                    ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                    : order.status === 'payment_pending'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                      : 'bg-sky-50 text-sky-700 border-sky-200'
+                          }`}
                         >
-                          {order.status === 'synced' ? 'Placed Online' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled' : 'Queued Offline'}
+                          {
+                            order.status === 'approved' ? '✓ Payment Approved' :
+                            order.status === 'synced' ? 'Placed Online' :
+                            order.status === 'rejected' ? 'Rejected' :
+                            order.status === 'cancelled' ? 'Cancelled' :
+                            order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
+                            'Queued Offline'
+                          }
                         </span>
                       </div>
                     </div>
@@ -2229,6 +2260,16 @@ export default function App() {
                           <div className="flex justify-between border-t border-rose-200 pt-1.5 font-bold text-slate-800">
                             <span>Total Paid:</span>
                             <span className="text-rose-600 font-black">₹{order.totalAmount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {order.status === 'payment_pending' && (
+                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 font-medium flex items-start gap-2">
+                          <span>⏳</span>
+                          <div>
+                            <strong>Payment Verification in Progress</strong>
+                            <p className="mt-0.5 text-amber-700">Your payment is being verified by our team. Your receipt will be available once approved. Please keep your Order Ref: <strong>{order.receiptId}</strong> safe.</p>
                           </div>
                         </div>
                       )}
@@ -2899,7 +2940,17 @@ export default function App() {
                                   >
                                     View / Print Bill
                                   </button>
-                                  {order.status !== 'rejected' && order.status !== 'cancelled' && (
+                                  {/* Approve button: only for payment_pending orders */}
+                                  {order.status === 'payment_pending' && (
+                                    <button
+                                      onClick={() => handleApproveOrder(order.id!)}
+                                      disabled={isLoading}
+                                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs px-2.5 py-0.5 rounded border border-emerald-600 transition-colors shadow-sm disabled:opacity-50"
+                                    >
+                                      ✓ Approve Payment
+                                    </button>
+                                  )}
+                                  {order.status !== 'rejected' && order.status !== 'cancelled' && order.status !== 'approved' && (
                                     <button
                                       onClick={() => {
                                         setRejectingOrderId(order.id!);
@@ -2915,16 +2966,28 @@ export default function App() {
                                     </button>
                                   )}
                                   <span
-                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.status === 'synced'
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      : order.status === 'rejected'
-                                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                        : order.status === 'cancelled'
-                                          ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                                      }`}
+                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                                      order.status === 'approved'
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : order.status === 'synced'
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                          : order.status === 'rejected'
+                                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                            : order.status === 'cancelled'
+                                              ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                              : order.status === 'payment_pending'
+                                                ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
+                                                : 'bg-sky-50 text-sky-700 border-sky-200'
+                                    }`}
                                   >
-                                    {order.status === 'synced' ? 'Synced' : order.status === 'rejected' ? 'Rejected' : order.status === 'cancelled' ? 'Cancelled by Customer' : 'Pending Sync'}
+                                    {
+                                      order.status === 'approved' ? '✓ Payment Approved' :
+                                      order.status === 'synced' ? 'Placed Online' :
+                                      order.status === 'rejected' ? 'Rejected' :
+                                      order.status === 'cancelled' ? 'Cancelled by Customer' :
+                                      order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
+                                      'Pending Sync'
+                                    }
                                   </span>
                                 </div>
                               </div>
@@ -2935,6 +2998,16 @@ export default function App() {
                                   <div><strong>Name:</strong> {order.shippingInfo.fullName}</div>
                                   <div><strong>Phone:</strong> {order.shippingInfo.phone}</div>
                                   <div><strong>Address:</strong> {order.shippingInfo.address}, {order.shippingInfo.city}, {order.shippingInfo.state}, {order.shippingInfo.country} - {order.shippingInfo.pincode}</div>
+                                </div>
+                              )}
+
+                              {order.status === 'payment_pending' && (
+                                <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                                  <span className="text-base">⚠️</span>
+                                  <div>
+                                    <strong>Payment Verification Required</strong>
+                                    <p className="mt-0.5 text-amber-700">Please check your PhonePe / bank statement for a payment of <strong>₹{order.totalAmount.toFixed(2)}</strong> from {order.shippingInfo?.fullName} ({order.shippingInfo?.phone}). Click <strong>Approve Payment</strong> above once confirmed.</p>
+                                  </div>
                                 </div>
                               )}
 
@@ -3598,6 +3671,57 @@ export default function App() {
               className={`w-full font-bold py-2.5 rounded-lg transition-colors shadow-md text-sm ${paymentConfirmed ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
             >
               {isLoading ? 'Processing...' : 'Confirm Payment & Finalize'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Awaiting Payment Approval Modal — shown after order submission, before admin approves */}
+      {pendingApprovalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm print:hidden">
+          <div className="bg-white border border-amber-200 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800 p-6 text-center">
+            {/* Pulsing clock icon */}
+            <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center mx-auto mb-4 text-3xl animate-pulse">
+              ⏳
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-1 font-serif">Order Submitted!</h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Your order has been received. Our team will verify your payment and approve it shortly. You will be able to view your bill after approval.
+            </p>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-left space-y-1.5 text-xs">
+              <div className="flex justify-between text-slate-700">
+                <span className="font-semibold text-slate-500">Order Ref:</span>
+                <span className="font-bold text-slate-800 font-mono">{pendingApprovalOrder.receiptId}</span>
+              </div>
+              <div className="flex justify-between text-slate-700">
+                <span className="font-semibold text-slate-500">Amount Paid:</span>
+                <span className="font-black text-rose-600">₹{pendingApprovalOrder.totalAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-700">
+                <span className="font-semibold text-slate-500">Status:</span>
+                <span className="font-bold text-amber-600 flex items-center gap-1">⏳ Pending Approval</span>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-5 text-xs text-blue-700 font-medium text-left">
+              📋 Keep your Order Ref number safe. Once admin approves your payment, you can view and print your receipt from <strong>My Orders</strong>.
+            </div>
+
+            <button
+              onClick={() => {
+                setPendingApprovalOrder(null);
+                setCurrentPage('my-orders');
+              }}
+              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-lg transition-colors shadow-md text-sm mb-2"
+            >
+              Track Order Status →
+            </button>
+            <button
+              onClick={() => setPendingApprovalOrder(null)}
+              className="w-full text-slate-500 hover:text-slate-700 font-medium py-1.5 text-xs transition-colors"
+            >
+              Close
             </button>
           </div>
         </div>
