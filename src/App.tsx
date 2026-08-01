@@ -118,6 +118,7 @@ export default function App() {
 
   // Payment states
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   // Bill/Receipt states
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
@@ -348,6 +349,7 @@ export default function App() {
                 isActive: item.is_active,
                 reviews: item.reviews || [],
                 sizes: item.sizes || [],
+                colorVariants: item.color_variants || [],
                 updatedAt: item.updated_at,
                 whatsappEnabled: item.whatsapp_enabled !== false
               };
@@ -571,7 +573,7 @@ export default function App() {
   };
 
   // Wrapper for Add to Cart
-  const handleAddToCart = async (product: Product, sizeOpt?: ProductSize) => {
+  const handleAddToCart = async (product: Product, sizeOpt?: ProductSize, variantOpt?: ColorVariant) => {
     if (product.stock <= 0) {
       showToast('This product is currently sold out.', 'error');
       return;
@@ -584,14 +586,16 @@ export default function App() {
     }
     setIsLoading(true);
     try {
-      await addToCart(product.id, sizeOpt);
-      showToast(`${product.name} added to cart successfully!`, 'success');
+      await addToCart(product.id, sizeOpt, variantOpt);
+      const variantLabel = variantOpt ? ` (${variantOpt.colorName})` : '';
+      showToast(`${product.name}${variantLabel} added to cart successfully!`, 'success');
     } catch (err) {
       showToast('Failed to add item to cart.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
+
 
   // File Upload Helper (converts to Base64 String and compresses using Canvas)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -666,7 +670,8 @@ export default function App() {
             productId: item.productId,
             quantity: item.quantity,
             priceAtPurchase: finalPrice,
-            selectedSize: item.selectedSize
+            selectedSize: item.selectedSize,
+            selectedVariant: item.selectedVariant
           });
 
           originalSubtotal += prod.price * item.quantity;
@@ -719,6 +724,7 @@ export default function App() {
 
       await clearCart();
       setIsPaymentOpen(false);
+      setPaymentConfirmed(false);
 
       // Save shipping fields
       setShipAddress('');
@@ -848,7 +854,11 @@ export default function App() {
       };
       await db.products.add(newProductObj);
       if (isCloudConfigured()) {
-        await syncProductToCloud(newProductObj);
+        try {
+          await syncProductToCloud(newProductObj);
+        } catch (syncErr) {
+          console.error("Failed to sync new product to cloud:", syncErr);
+        }
       }
       showToast('Product added successfully to catalog!', 'success');
       setNewProductName('');
@@ -1828,12 +1838,13 @@ export default function App() {
                       {/* Color variant swatches row */}
                       {product.colorVariants && product.colorVariants.length > 0 && (
                         <div className="flex items-center gap-1.5 px-2 py-1.5 bg-white border-t border-rose-50">
-                          {/* Main/default swatch */}
+                          {/* Main/default swatch showing main product image */}
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setActiveVariantMap(m => ({ ...m, [product.id]: '' })); }}
                             title="Main color"
-                            className={`w-5 h-5 rounded-full border-2 transition-all ${!activeVariantMap[product.id] ? 'border-rose-500 scale-110 shadow' : 'border-slate-200 hover:border-rose-300'} bg-slate-200 shrink-0`}
+                            className={`w-6 h-6 rounded-full border-2 transition-all ${!activeVariantMap[product.id] ? 'border-rose-500 scale-110 shadow-md' : 'border-slate-200 hover:border-rose-300'} bg-slate-100 shrink-0`}
+                            style={product.imageUrl ? { backgroundImage: `url(${product.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                           />
                           {product.colorVariants.map(v => (
                             <button
@@ -1841,8 +1852,8 @@ export default function App() {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setActiveVariantMap(m => ({ ...m, [product.id]: v.id })); }}
                               title={v.colorName}
-                              className={`w-5 h-5 rounded-full border-2 transition-all shrink-0 ${activeVariantMap[product.id] === v.id ? 'border-rose-500 scale-110 shadow' : 'border-slate-200 hover:border-rose-300'}`}
-                              style={{ background: v.colorHex || '#ccc' }}
+                              className={`w-6 h-6 rounded-full border-2 transition-all shrink-0 ${activeVariantMap[product.id] === v.id ? 'border-rose-500 scale-110 shadow-md' : 'border-slate-200 hover:border-rose-300'}`}
+                              style={v.imageUrl ? { backgroundImage: `url(${v.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: v.colorHex || '#ccc' }}
                             />
                           ))}
                           <span className="text-[9px] text-slate-400 ml-auto">
@@ -1897,9 +1908,13 @@ export default function App() {
                           <div className="flex gap-1.5 justify-end w-full sm:w-auto mt-1 sm:mt-0">
                             {showProductWhatsapp && product.whatsappEnabled !== false && (
                               <a
-                                href={`https://wa.me/917890784816?text=${encodeURIComponent(
-                                  `Hello KRP Creation! I am interested in inquiring about this garment:\n\n👗 *Product Name:* ${product.name}\n💰 *Price:* ₹${discountedPrice.toFixed(2)}\n📂 *Category:* ${product.category}\n\nCan you please share availability and more details?`
-                                )}`}
+                                href={(() => {
+                                  const activeVId = activeVariantMap[product.id];
+                                  const activeV = product.colorVariants?.find(v => v.id === activeVId);
+                                  const variantLine = activeV ? `\n🎨 *Selected Option:* ${activeV.colorName}` : '';
+                                  const msg = `Hello KRP Creation! I am interested in inquiring about this garment:\n\n👗 *Product Name:* ${product.name}${variantLine}\n💰 *Price:* ₹${discountedPrice.toFixed(2)}\n📂 *Category:* ${product.category}\n\nCan you please share availability and more details?`;
+                                  return `https://wa.me/917890784816?text=${encodeURIComponent(msg)}`;
+                                })()}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
@@ -1912,7 +1927,12 @@ export default function App() {
                               </a>
                             )}
                             {(() => {
-                              const isInCart = cartItems.some((item) => item.productId === product.id);
+                              const activeVId = activeVariantMap[product.id];
+                              const activeV = activeVId ? product.colorVariants?.find(v => v.id === activeVId) : undefined;
+                              const isInCart = cartItems.some((item) =>
+                                item.productId === product.id &&
+                                (activeV ? (item.selectedVariant?.id === activeV.id) : !item.selectedVariant)
+                              );
                               if (isInCart) {
                                 return (
                                   <button
@@ -1930,7 +1950,7 @@ export default function App() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleAddToCart(product);
+                                    handleAddToCart(product, undefined, activeV);
                                   }}
                                   disabled={isSoldOut}
                                   className={`text-[10px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-4 rounded-lg transition-colors shadow-sm text-center shrink-0 ${isSoldOut
@@ -1983,19 +2003,22 @@ export default function App() {
                     const prod = products.find((p) => p.id === item.productId);
                     if (!prod) return null;
                     const finalPrice = getProductPrice(prod);
-                    const hasDiscount = prod.discount && prod.discount > 0;
+                    const hasDiscount = !!(prod.discount && prod.discount > 0);
                     return (
                       <div
                         key={item.id}
                         className="flex items-center gap-4 bg-white border border-rose-100 p-4 rounded-2xl shadow-sm"
                       >
-                        {prod.imageUrl ? (
-                          <img src={prod.imageUrl} alt={prod.name} className="w-20 h-20 object-cover rounded-lg bg-rose-50" />
-                        ) : (
-                          <div className="w-20 h-20 flex flex-col items-center justify-center bg-rose-100 border border-rose-200 text-rose-500 rounded-lg font-bold text-[9px] text-center px-1">
-                            <span>👗 No Image</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const imgSrc = item.selectedVariant?.imageUrl || prod.imageUrl;
+                          return imgSrc ? (
+                            <img src={imgSrc} alt={prod.name} className="w-20 h-20 object-cover rounded-lg bg-rose-50" />
+                          ) : (
+                            <div className="w-20 h-20 flex flex-col items-center justify-center bg-rose-100 border border-rose-200 text-rose-500 rounded-lg font-bold text-[9px] text-center px-1">
+                              <span>👗 No Image</span>
+                            </div>
+                          );
+                        })()}
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-slate-800 truncate">{prod.name}</h4>
                           <div className="flex items-baseline gap-2 mt-1">
@@ -2007,6 +2030,11 @@ export default function App() {
                           <div className="text-[10px] text-slate-400 mt-1">
                             Charges: Del ₹{prod.deliveryCharge || 0} • Saf ₹{prod.safetyFee || 0}
                           </div>
+                          {item.selectedVariant && (
+                            <div className="mt-1 text-[10px] text-rose-700 bg-rose-50 border border-rose-100 rounded-md px-2 py-0.5 w-fit font-bold flex items-center gap-1">
+                              🎨 Option: {item.selectedVariant.colorName}
+                            </div>
+                          )}
                           {item.selectedSize && (
                             <div className="mt-1 text-[10px] text-rose-700 bg-rose-50 border border-rose-100 rounded-md px-2 py-0.5 w-fit font-bold">
                               📏 Size: {item.selectedSize.size} ({item.selectedSize.length})
@@ -2015,14 +2043,14 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.productId, item.quantity - 1, item.selectedSize, item.selectedVariant)}
                             className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 hover:bg-rose-100 flex items-center justify-center font-bold text-rose-700"
                           >
                             -
                           </button>
                           <span className="w-8 text-center font-bold text-slate-700">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.productId, Math.min(prod.stock, item.quantity + 1))}
+                            onClick={() => updateQuantity(item.productId, Math.min(prod.stock, item.quantity + 1), item.selectedSize, item.selectedVariant)}
                             className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 hover:bg-rose-100 flex items-center justify-center font-bold text-rose-700"
                           >
                             +
@@ -2601,50 +2629,75 @@ export default function App() {
                             <div className="space-y-2 border-t border-rose-100 pt-3.5 mt-1">
                               <label className="block text-xs font-bold text-slate-700">Color Variants (Optional)</label>
                               <p className="text-[10px] text-slate-400">Add multiple color options — each with its own image.</p>
-                              <div className="flex gap-1.5 flex-wrap items-end">
-                                <input
-                                  type="text"
-                                  placeholder="Color name e.g. Red"
-                                  value={newVariantName}
-                                  onChange={(e) => setNewVariantName(e.target.value)}
-                                  className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
-                                />
-                                <input
-                                  type="color"
-                                  value={newVariantHex}
-                                  onChange={(e) => setNewVariantHex(e.target.value)}
-                                  title="Pick swatch color"
-                                  className="h-9 w-9 rounded-lg border border-rose-100 cursor-pointer p-0.5 shrink-0"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Image URL for this color"
-                                  value={newVariantImage}
-                                  onChange={(e) => setNewVariantImage(e.target.value)}
-                                  className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
-                                />
+                              <div className="space-y-2 bg-rose-50/10 p-2.5 rounded-lg border border-rose-100/40">
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Color name e.g. Red"
+                                    value={newVariantName}
+                                    onChange={(e) => setNewVariantName(e.target.value)}
+                                    className="flex-1 bg-white border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                                  />
+                                  <input
+                                    type="color"
+                                    value={newVariantHex}
+                                    onChange={(e) => setNewVariantHex(e.target.value)}
+                                    title="Pick swatch color"
+                                    className="h-8 w-8 rounded-lg border border-rose-100 cursor-pointer p-0.5 shrink-0"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-[10px] text-slate-500 mb-0.5">Upload Variant Image</label>
+                                    <input
+                                      id="newVariantFileInput"
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => handleFileUpload(e, setNewVariantImage)}
+                                      className="w-full bg-white border border-rose-100 rounded-lg p-1 text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] text-slate-500 mb-0.5">Or Paste Variant Image URL</label>
+                                    <input
+                                      type="text"
+                                      placeholder="https://example.com/image.jpg"
+                                      value={newVariantImage}
+                                      onChange={(e) => setNewVariantImage(e.target.value)}
+                                      className="w-full bg-white border border-rose-100 rounded-lg p-1.5 text-xs focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (!newVariantName.trim() || !newVariantImage.trim()) return;
+                                    if (!newVariantImage.trim()) {
+                                      showToast('Please provide an image.', 'error');
+                                      return;
+                                    }
+                                    const variantIndex = newProductVariants.length + 1;
                                     const v: ColorVariant = {
                                       id: 'cv_' + Math.random().toString(36).substr(2, 8),
-                                      colorName: newVariantName.trim(),
+                                      colorName: newVariantName.trim() || `Option ${variantIndex}`,
                                       colorHex: newVariantHex,
                                       imageUrl: newVariantImage.trim()
                                     };
                                     setNewProductVariants(prev => [...prev, v]);
                                     setNewVariantName('');
                                     setNewVariantImage('');
+                                    const fileInput = document.getElementById('newVariantFileInput') as HTMLInputElement;
+                                    if (fileInput) fileInput.value = '';
                                   }}
-                                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-2 rounded-lg shrink-0"
-                                >+ Add</button>
+                                  className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors"
+                                >
+                                  + Add Variant
+                                </button>
                               </div>
                               {newProductVariants.length > 0 && (
                                 <div className="flex flex-wrap gap-2 pt-1">
                                   {newProductVariants.map(v => (
-                                    <div key={v.id} className="flex items-center gap-1.5 bg-white border border-rose-100 rounded-full px-2.5 py-1 text-[10px] font-medium shadow-sm">
-                                      <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ background: v.colorHex || '#ccc' }} />
+                                    <div key={v.id} className="flex items-center gap-1.5 bg-white border border-rose-100 rounded-full px-2 py-0.5 text-[10px] font-medium shadow-sm">
+                                      <span className="w-5 h-5 rounded-full shrink-0 border border-white shadow-sm" style={v.imageUrl ? { backgroundImage: `url(${v.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: v.colorHex || '#ccc' }} />
                                       <span className="text-slate-700">{v.colorName}</span>
                                       <button type="button" onClick={() => setNewProductVariants(prev => prev.filter(x => x.id !== v.id))} className="text-rose-400 hover:text-rose-600 font-bold ml-0.5">✕</button>
                                     </div>
@@ -3483,7 +3536,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
           <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-805 p-6 text-center">
             <button
-              onClick={() => setIsPaymentOpen(false)}
+              onClick={() => { setIsPaymentOpen(false); setPaymentConfirmed(false); }}
               className="absolute top-3 right-3 bg-rose-50 hover:bg-rose-100 text-rose-700 w-8 h-8 rounded-full flex items-center justify-center font-bold border border-rose-100"
             >
               ✕
@@ -3525,11 +3578,26 @@ export default function App() {
               <span className="text-lg text-rose-600 font-black">₹{cartGrandTotal.toFixed(2)}</span>
             </div>
 
+            {/* Payment confirmation checkbox */}
+            <label className={`flex items-start gap-2.5 mb-4 p-3 rounded-xl border cursor-pointer transition-colors select-none text-left ${paymentConfirmed ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-100'}`}>
+              <input
+                type="checkbox"
+                id="paymentConfirmCheckbox"
+                checked={paymentConfirmed}
+                onChange={(e) => setPaymentConfirmed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0 cursor-pointer"
+              />
+              <span className={`text-xs font-semibold leading-tight ${paymentConfirmed ? 'text-emerald-700' : 'text-slate-600'}`}>
+                I confirm that I have completed the UPI payment of <span className="font-black text-rose-600">₹{cartGrandTotal.toFixed(2)}</span> to KRP Creation.
+              </span>
+            </label>
+
             <button
               onClick={handleConfirmPayment}
-              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-lg transition-colors shadow-md text-sm"
+              disabled={!paymentConfirmed || isLoading}
+              className={`w-full font-bold py-2.5 rounded-lg transition-colors shadow-md text-sm ${paymentConfirmed ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
             >
-              Confirm Payment & Finalize
+              {isLoading ? 'Processing...' : 'Confirm Payment & Finalize'}
             </button>
           </div>
         </div>
@@ -3734,7 +3802,7 @@ export default function App() {
                           onClick={() => setDetailActiveVariant(null)}
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold transition-all ${!detailActiveVariant ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-rose-100 bg-white text-slate-600 hover:border-rose-300'}`}
                         >
-                          <span className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" />
+                          <span className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" style={selectedProduct.imageUrl ? { backgroundImage: `url(${selectedProduct.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} />
                           Main
                         </button>
                         {selectedProduct.colorVariants.map(v => (
@@ -3744,7 +3812,7 @@ export default function App() {
                             onClick={() => setDetailActiveVariant(v)}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold transition-all ${detailActiveVariant?.id === v.id ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-rose-100 bg-white text-slate-600 hover:border-rose-300'}`}
                           >
-                            <span className="w-3.5 h-3.5 rounded-full shrink-0 border border-slate-200" style={{ background: v.colorHex || '#ccc' }} />
+                            <span className="w-3.5 h-3.5 rounded-full shrink-0 border border-slate-200" style={v.imageUrl ? { backgroundImage: `url(${v.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: v.colorHex || '#ccc' }} />
                             {v.colorName}
                           </button>
                         ))}
@@ -3907,9 +3975,21 @@ export default function App() {
 
             {/* Bottom Add to Cart banner */}
             <div className="bg-rose-50/50 p-4 border-t border-rose-100 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-450">Base Price: ₹{selectedProduct.price.toFixed(2)}</span>
+              <div className="flex flex-col">
+                <span className="text-xs text-slate-450">Base Price: ₹{selectedProduct.price.toFixed(2)}</span>
+                {detailActiveVariant && (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-0.5">
+                    🎨 {detailActiveVariant.colorName}
+                  </span>
+                )}
+              </div>
               {(() => {
-                const isInCart = cartItems.some((item) => item.productId === selectedProduct.id);
+                const isInCart = cartItems.some((item) =>
+                  item.productId === selectedProduct.id &&
+                  (detailActiveVariant
+                    ? item.selectedVariant?.id === detailActiveVariant.id
+                    : !item.selectedVariant)
+                );
                 if (isInCart) {
                   return (
                     <button
@@ -3935,8 +4015,9 @@ export default function App() {
                       }
                       setIsLoading(true);
                       try {
-                        await addToCart(selectedProduct.id, selectedUserSize || undefined);
-                        showToast(`${selectedProduct.name} added to cart successfully!`, 'success');
+                        await addToCart(selectedProduct.id, selectedUserSize || undefined, detailActiveVariant || undefined);
+                        const variantLabel = detailActiveVariant ? ` (${detailActiveVariant.colorName})` : '';
+                        showToast(`${selectedProduct.name}${variantLabel} added to cart successfully!`, 'success');
                         setSelectedProduct(null);
                         setSelectedUserSize(null);
                         setReviewComment('');
@@ -3962,6 +4043,7 @@ export default function App() {
           </div>
         </div>
       )}
+
 
       {/* Edit/Update stock, pricing fees, and visibility active slide-out sidebar */}
       {editingProductId && (
@@ -4200,50 +4282,75 @@ export default function App() {
                 <div className="space-y-2 border-t border-rose-100 pt-3.5 mt-1">
                   <label className="block text-xs font-bold text-slate-700">Color Variants</label>
                   <p className="text-[10px] text-slate-400">Add color options for this product — each with its own image.</p>
-                  <div className="flex gap-1.5 flex-wrap items-end">
-                    <input
-                      type="text"
-                      placeholder="Color name e.g. Blue"
-                      value={editVariantName}
-                      onChange={(e) => setEditVariantName(e.target.value)}
-                      className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
-                    />
-                    <input
-                      type="color"
-                      value={editVariantHex}
-                      onChange={(e) => setEditVariantHex(e.target.value)}
-                      title="Pick swatch color"
-                      className="h-9 w-9 rounded-lg border border-rose-100 cursor-pointer p-0.5 shrink-0"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Image URL for this color"
-                      value={editVariantImage}
-                      onChange={(e) => setEditVariantImage(e.target.value)}
-                      className="flex-1 min-w-0 bg-rose-50/20 border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
-                    />
+                  <div className="space-y-2 bg-rose-50/10 p-2.5 rounded-lg border border-rose-100/40">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Color name e.g. Blue"
+                        value={editVariantName}
+                        onChange={(e) => setEditVariantName(e.target.value)}
+                        className="flex-1 bg-white border border-rose-100 rounded-lg p-2 text-xs focus:outline-none"
+                      />
+                      <input
+                        type="color"
+                        value={editVariantHex}
+                        onChange={(e) => setEditVariantHex(e.target.value)}
+                        title="Pick swatch color"
+                        className="h-8 w-8 rounded-lg border border-rose-100 cursor-pointer p-0.5 shrink-0"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Upload Variant Image</label>
+                        <input
+                          id="editVariantFileInput"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, setEditVariantImage)}
+                          className="w-full bg-white border border-rose-100 rounded-lg p-1 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Or Paste Variant Image URL</label>
+                        <input
+                          type="text"
+                          placeholder="https://example.com/image.jpg"
+                          value={editVariantImage}
+                          onChange={(e) => setEditVariantImage(e.target.value)}
+                          className="w-full bg-white border border-rose-100 rounded-lg p-1.5 text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
-                        if (!editVariantName.trim() || !editVariantImage.trim()) return;
+                        if (!editVariantImage.trim()) {
+                          showToast('Please provide an image.', 'error');
+                          return;
+                        }
+                        const variantIndex = editVariants.length + 1;
                         const v: ColorVariant = {
                           id: 'cv_' + Math.random().toString(36).substr(2, 8),
-                          colorName: editVariantName.trim(),
+                          colorName: editVariantName.trim() || `Option ${variantIndex}`,
                           colorHex: editVariantHex,
                           imageUrl: editVariantImage.trim()
                         };
                         setEditVariants(prev => [...prev, v]);
                         setEditVariantName('');
                         setEditVariantImage('');
+                        const fileInput = document.getElementById('editVariantFileInput') as HTMLInputElement;
+                        if (fileInput) fileInput.value = '';
                       }}
-                      className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-2 rounded-lg shrink-0"
-                    >+ Add</button>
+                      className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors"
+                    >
+                      + Add Variant
+                    </button>
                   </div>
                   {editVariants.length > 0 && (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {editVariants.map(v => (
-                        <div key={v.id} className="flex items-center gap-1.5 bg-white border border-rose-100 rounded-full px-2.5 py-1 text-[10px] font-medium shadow-sm">
-                          <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ background: v.colorHex || '#ccc' }} />
+                        <div key={v.id} className="flex items-center gap-1.5 bg-white border border-rose-100 rounded-full px-2 py-0.5 text-[10px] font-medium shadow-sm">
+                          <span className="w-5 h-5 rounded-full shrink-0 border border-white shadow-sm" style={v.imageUrl ? { backgroundImage: `url(${v.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: v.colorHex || '#ccc' }} />
                           <span className="text-slate-700">{v.colorName}</span>
                           <button type="button" onClick={() => setEditVariants(prev => prev.filter(x => x.id !== v.id))} className="text-rose-400 hover:text-rose-600 font-bold ml-0.5">✕</button>
                         </div>

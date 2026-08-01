@@ -48,6 +48,7 @@ export interface CartItem {
   productId: string;
   quantity: number;
   selectedSize?: ProductSize; // Size selected by user
+  selectedVariant?: ColorVariant; // Color variant selected by user
 }
 
 export interface Order {
@@ -57,6 +58,7 @@ export interface Order {
     quantity: number;
     priceAtPurchase: number;
     selectedSize?: ProductSize; // Size selected at purchase
+    selectedVariant?: ColorVariant; // Color variant selected at purchase
   }[];
   totalAmount: number;
   status: 'pending_sync' | 'synced' | 'rejected' | 'cancelled';
@@ -136,7 +138,7 @@ export const db = new OfflineEcommerceDB();
 
 // Clean up legacy products and delete default items on startup
 db.open().then(async () => {
-  const allowedCategories = ['Saree', 'Dress', 'Kurti', 'Salwar Suit', 'Jackets'];
+  const allowedCategories = ['Saree', 'Dress', 'Kurti', 'Salwar Suit', 'Jackets', 'pencil pants', 'palazzo pants', 'pants'];
   const allProds = await db.products.toArray();
   
   // Delete legacy products
