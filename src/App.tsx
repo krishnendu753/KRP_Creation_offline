@@ -376,7 +376,7 @@ export default function App() {
                 isActive: item.is_active,
                 reviews: item.reviews || [],
                 sizes: item.sizes || [],
-                color_variants: item.color_variants || [],
+                colorVariants: item.color_variants || [],
                 updatedAt: item.updated_at,
                 whatsappEnabled: item.whatsapp_enabled !== false
               };
@@ -3860,12 +3860,7 @@ export default function App() {
                 <input
                   type="text"
                   required
-                  pattern="[0-9]*"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="6-digit Pincode"
-                  value={shipPincode}
-                  onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
+onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
                   className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-450 focus:outline-none text-slate-850"
                 />
               </div>
@@ -3882,69 +3877,86 @@ export default function App() {
 
       {/* Payment Scan QR & UPI ID Modal */}
       {isPaymentOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
-          <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-805 p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden animate-in fade-in duration-200">
+          <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-805 p-4 text-center">
             <button
               onClick={() => { setIsPaymentOpen(false); setPaymentConfirmed(false); }}
-              className="absolute top-3 right-3 bg-rose-50 hover:bg-rose-100 text-rose-700 w-8 h-8 rounded-full flex items-center justify-center font-bold border border-rose-100"
+              className="absolute top-2.5 right-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 w-6 h-6 rounded-full flex items-center justify-center font-bold border border-rose-100 text-xs"
             >
               ✕
             </button>
-            <h3 className="text-xl font-bold text-slate-800 mb-2 font-serif border-b border-rose-50 pb-2">Scan & Pay</h3>
-            <p className="text-xs text-slate-505 mb-5">Scan this QR code using any UPI application to complete payment.</p>
+            <h3 className="text-base font-bold text-slate-800 mb-1 font-serif border-b border-rose-50 pb-1">Scan & Pay</h3>
+            <p className="text-[10px] text-slate-505 mb-2">Scan QR code using any UPI app to complete payment.</p>
 
-            <div className="my-5">
+            <div className="my-2">
               {/* Clickable QR Code scanner targeting direct payment app redirects */}
               <a
-                href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL&am=${cartGrandTotal.toFixed(2)}&tn=KRP%20Creation%20Order&cu=INR`}
+                href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL`}
                 title="Pay with UPI App"
                 className="block hover:opacity-95 transition-opacity"
               >
                 <img
                   src={`${localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co'}/storage/v1/object/public/assets/qr_phonepe.jpg`}
                   alt="Scan to Pay PhonePe"
-                  className="w-48 h-auto mx-auto border-2 border-rose-100 p-1 rounded-2xl bg-white shadow-sm cursor-pointer"
+                  className="w-32 h-auto mx-auto border border-rose-100 p-0.5 rounded-xl bg-white shadow-sm cursor-pointer"
                 />
               </a>
             </div>
 
-            {/* Clickable UPI link details */}
-            <a
-              href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL&am=${cartGrandTotal.toFixed(2)}&tn=KRP%20Creation%20Order&cu=INR`}
-              className="block bg-rose-50 hover:bg-rose-100/80 border border-rose-100 p-3 rounded-xl mb-4 text-xs space-y-1 transition-colors cursor-pointer text-left"
-            >
-              <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold text-center">Payment Details (Click to Pay)</div>
-              <div className="text-xs font-bold text-slate-705 text-center truncate">UPI ID: <span className="text-rose-650 underline">7890784816-3@ybl</span></div>
+            {/* Copy UPI ID card */}
+            <div className="bg-rose-50/55 border border-rose-100 p-2 rounded-xl mb-3 text-xs space-y-1.5 text-left">
+              <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold text-center">Payment UPI ID</div>
+              <div className="flex gap-2">
+                <a
+                  href={`upi://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL`}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold py-1.5 rounded transition-colors text-center flex items-center justify-center gap-0.5"
+                >
+                  ⚡ Pay Directly
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('7890784816-3@ybl');
+                    showToast('UPI ID copied to clipboard!', 'success');
+                  }}
+                  className="bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 flex items-center gap-0.5"
+                >
+                  📋 Copy ID
+                </button>
+              </div>
+              <div className="text-[8px] text-amber-700 font-semibold text-center bg-amber-50 p-1 rounded border border-amber-100">
+                ⚠️ If app fails, copy ID and paste it in PhonePe, GPay, Paytm.
+              </div>
               {sellerInfoEnabled && (
-                <div className="text-[10px] text-slate-500 border-t border-rose-100/40 pt-1 mt-1 font-medium text-center">
+                <div className="text-[9px] text-slate-500 border-t border-rose-100/40 pt-0.5 mt-0.5 font-medium text-center">
                   Seller: <strong>Ranu Das Pal</strong> (7890784816)
                 </div>
               )}
-            </a>
+            </div>
 
-            <div className="flex justify-between items-center text-sm font-bold mb-5 px-1 text-slate-700">
+            <div className="flex justify-between items-center text-xs font-bold mb-2.5 px-1 text-slate-700">
               <span>Amount to Pay:</span>
-              <span className="text-lg text-rose-600 font-black">₹{cartGrandTotal.toFixed(2)}</span>
+              <span className="text-base text-rose-600 font-black">₹{cartGrandTotal.toFixed(2)}</span>
             </div>
 
             {/* Payment confirmation checkbox */}
-            <label className={`flex items-start gap-2.5 mb-4 p-3 rounded-xl border cursor-pointer transition-colors select-none text-left ${paymentConfirmed ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-100'}`}>
+            <label className={`flex items-start gap-2 mb-3 p-2 rounded-xl border cursor-pointer transition-colors select-none text-left ${paymentConfirmed ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50/50 border-rose-100'}`}>
               <input
                 type="checkbox"
                 id="paymentConfirmCheckbox"
                 checked={paymentConfirmed}
                 onChange={(e) => setPaymentConfirmed(e.target.checked)}
-                className="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0 cursor-pointer"
+                className="mt-0.5 w-3.5 h-3.5 accent-emerald-600 shrink-0 cursor-pointer"
               />
-              <span className={`text-xs font-semibold leading-tight ${paymentConfirmed ? 'text-emerald-700' : 'text-slate-600'}`}>
-                I confirm that I have completed the UPI payment of <span className="font-black text-rose-600">₹{cartGrandTotal.toFixed(2)}</span> to KRP Creation.
+              <span className={`text-[10px] font-semibold leading-tight ${paymentConfirmed ? 'text-emerald-700' : 'text-slate-600'}`}>
+                I confirm that I paid <span className="font-black text-rose-600">₹{cartGrandTotal.toFixed(2)}</span> to KRP Creation.
               </span>
             </label>
 
             <button
               onClick={handleConfirmPayment}
               disabled={!paymentConfirmed || isLoading}
-              className={`w-full font-bold py-2.5 rounded-lg transition-colors shadow-md text-sm ${paymentConfirmed ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+              className={`w-full font-bold py-2 rounded-lg transition-colors shadow-md text-xs ${paymentConfirmed ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
             >
               {isLoading ? 'Processing...' : 'Confirm Payment & Finalize'}
             </button>
