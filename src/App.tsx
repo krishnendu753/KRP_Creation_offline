@@ -168,6 +168,7 @@ export default function App() {
   const [editPrice, setEditPrice] = useState('');
   const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('supabase_url') || 'https://ggbevhaudwhbpevjbdhq.supabase.co');
   const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('supabase_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI');
+  const [supabaseAdminSecret, setSupabaseAdminSecret] = useState(() => localStorage.getItem('supabase_admin_secret') || '');
   const [rejectingOrderId, setRejectingOrderId] = useState<number | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
@@ -3659,6 +3660,7 @@ export default function App() {
                           e.preventDefault();
                           localStorage.setItem('supabase_url', supabaseUrl.trim());
                           localStorage.setItem('supabase_key', supabaseKey.trim());
+                          localStorage.setItem('supabase_admin_secret', supabaseAdminSecret.trim());
                           showToast('Supabase Cloud credentials updated!', 'success');
                           if (supabaseUrl.trim() && supabaseKey.trim()) {
                             setIsLoading(true);
@@ -3692,6 +3694,16 @@ export default function App() {
                               placeholder="eyJhbGciOi..."
                               value={supabaseKey}
                               onChange={(e) => setSupabaseKey(e.target.value)}
+                              className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 mb-1">Admin Sync Secret (Optional - for RLS Security)</label>
+                            <input
+                              type="password"
+                              placeholder="Enter a secret password to prevent database hacking"
+                              value={supabaseAdminSecret}
+                              onChange={(e) => setSupabaseAdminSecret(e.target.value)}
                               className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400"
                             />
                           </div>

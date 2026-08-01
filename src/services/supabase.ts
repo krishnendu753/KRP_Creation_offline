@@ -8,9 +8,14 @@ const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 export const getSupabaseClient = () => {
   const url = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
   const key = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
+  const adminSecret = localStorage.getItem('supabase_admin_secret') || '';
   if (!url || !key) return null;
   try {
-    return createClient(url, key);
+    return createClient(url, key, {
+      global: {
+        headers: adminSecret ? { 'x-admin-secret': adminSecret } : {}
+      }
+    });
   } catch (err) {
     console.error("Invalid Supabase connection parameters: ", err);
     return null;
