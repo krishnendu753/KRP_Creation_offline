@@ -201,7 +201,7 @@ export default function App() {
   const [eventLink, setEventLink] = useState('');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
-   // Admin Dashboard Active Tab State
+  // Admin Dashboard Active Tab State
   // tabs: 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'
   const [adminActiveTab, setAdminActiveTab] = useState<'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'>('inventory');
 
@@ -332,13 +332,13 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Cloud announcements sync failed: ", err);
-        });      pullEventsFromCloud()
-        .then((count) => {
-          console.log(`Successfully synchronized ${count} events from Cloud Database.`);
-        })
-        .catch((err) => {
-          console.error("Cloud events sync failed: ", err);
-        });
+        }); pullEventsFromCloud()
+          .then((count) => {
+            console.log(`Successfully synchronized ${count} events from Cloud Database.`);
+          })
+          .catch((err) => {
+            console.error("Cloud events sync failed: ", err);
+          });
 
       pullCategoriesFromCloud()
         .then((count) => {
@@ -2348,8 +2348,7 @@ export default function App() {
                           </button>
                         )}
                         <span
-                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${
-                            order.status === 'approved'
+                          className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'approved'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                               : order.status === 'synced'
                                 ? 'bg-blue-50 text-blue-700 border-blue-200'
@@ -2360,15 +2359,15 @@ export default function App() {
                                     : order.status === 'payment_pending'
                                       ? 'bg-amber-50 text-amber-700 border-amber-300'
                                       : 'bg-sky-50 text-sky-700 border-sky-200'
-                          }`}
+                            }`}
                         >
                           {
                             order.status === 'approved' ? '✓ Payment Approved' :
-                            order.status === 'synced' ? 'Placed Online' :
-                            order.status === 'rejected' ? 'Rejected' :
-                            order.status === 'cancelled' ? 'Cancelled' :
-                            order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
-                            'Queued Offline'
+                              order.status === 'synced' ? 'Placed Online' :
+                                order.status === 'rejected' ? 'Rejected' :
+                                  order.status === 'cancelled' ? 'Cancelled' :
+                                    order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
+                                      'Queued Offline'
                           }
                         </span>
                       </div>
@@ -3135,8 +3134,7 @@ export default function App() {
                                     </button>
                                   )}
                                   <span
-                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
-                                      order.status === 'approved'
+                                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.status === 'approved'
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                         : order.status === 'synced'
                                           ? 'bg-blue-50 text-blue-700 border-blue-200'
@@ -3147,15 +3145,15 @@ export default function App() {
                                               : order.status === 'payment_pending'
                                                 ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
                                                 : 'bg-sky-50 text-sky-700 border-sky-200'
-                                    }`}
+                                      }`}
                                   >
                                     {
                                       order.status === 'approved' ? '✓ Payment Approved' :
-                                      order.status === 'synced' ? 'Placed Online' :
-                                      order.status === 'rejected' ? 'Rejected' :
-                                      order.status === 'cancelled' ? 'Cancelled by Customer' :
-                                      order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
-                                      'Pending Sync'
+                                        order.status === 'synced' ? 'Placed Online' :
+                                          order.status === 'rejected' ? 'Rejected' :
+                                            order.status === 'cancelled' ? 'Cancelled by Customer' :
+                                              order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
+                                                'Pending Sync'
                                     }
                                   </span>
                                 </div>
@@ -3447,7 +3445,7 @@ export default function App() {
                         <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">
                           {editingCategoryId ? 'Edit Category' : 'Create New Category'}
                         </h3>
-                        
+
                         {editingCategoryId ? (
                           <form onSubmit={handleUpdateCategory} className="space-y-4 text-xs">
                             <div>
@@ -3760,113 +3758,122 @@ export default function App() {
 
       {/* Checkout Shipping Form Modal */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
-          <div className="bg-white border border-rose-100 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-805 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden animate-in fade-in duration-200">
+          <div className="bg-white border border-rose-100 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-805 p-4">
             <button
               onClick={() => setIsCheckoutOpen(false)}
-              className="absolute top-3 right-3 bg-rose-50 hover:bg-rose-100 text-rose-700 w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors border border-rose-100"
+              className="absolute top-2.5 right-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 w-6 h-6 rounded-full flex items-center justify-center font-bold transition-colors border border-rose-100 text-xs"
             >
               ✕
             </button>
-            <h3 className="text-xl font-bold text-slate-800 mb-2 border-b border-rose-55 pb-2 font-serif">Delivery Information</h3>
-            <p className="text-xs text-slate-505 mb-4">All delivery address fields are mandatory.</p>
+            <h3 className="text-base font-bold text-slate-800 mb-0.5 border-b border-rose-55 pb-1 font-serif">Delivery Information</h3>
+            <p className="text-[10px] text-slate-500 mb-3">All fields are mandatory for shipping.</p>
 
-            <form onSubmit={handleShippingSubmit} className="space-y-3.5 text-sm">
-              <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">Receiver's Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={shipName}
-                  onChange={(e) => setShipName(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-450 focus:outline-none text-slate-850"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">Contact Phone *</label>
-                <input
-                  type="tel"
-                  required
-                  pattern="[0-9]*"
-                  inputMode="numeric"
-                  value={shipPhone}
-                  onChange={(e) => setShipPhone(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-455 focus:outline-none text-slate-850"
-                />
-              </div>
-
-              {/* Relative dropdown: Country */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">Country *</label>
-                <select
-                  required
-                  value={shipCountry}
-                  onChange={(e) => setShipCountry(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-455 focus:outline-none text-slate-850"
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+            <form onSubmit={handleShippingSubmit} className="space-y-2 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Receiver's Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={shipName}
+                    onChange={(e) => setShipName(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-450 focus:outline-none text-slate-850"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Contact Phone *</label>
+                  <input
+                    type="tel"
+                    required
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    value={shipPhone}
+                    onChange={(e) => setShipPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850"
+                  />
+                </div>
               </div>
 
-              {/* Relative dropdown: State */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">State *</label>
-                <select
-                  required
-                  disabled={!shipCountry}
-                  value={shipState}
-                  onChange={(e) => setShipState(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select State</option>
-                  {states.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+              {/* Grid: Country, State, City */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Country *</label>
+                  <select
+                    required
+                    value={shipCountry}
+                    onChange={(e) => setShipCountry(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 text-[11px]"
+                  >
+                    <option value="">Country</option>
+                    {countries.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">State *</label>
+                  <select
+                    required
+                    disabled={!shipCountry}
+                    value={shipState}
+                    onChange={(e) => setShipState(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
+                  >
+                    <option value="">State</option>
+                    {states.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">City *</label>
+                  <select
+                    required
+                    disabled={!shipState}
+                    value={shipCity}
+                    onChange={(e) => setShipCity(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
+                  >
+                    <option value="">City</option>
+                    {cities.map((ci) => (
+                      <option key={ci} value={ci}>{ci}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Relative dropdown: City */}
               <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">City *</label>
-                <select
-                  required
-                  disabled={!shipState}
-                  value={shipCity}
-                  onChange={(e) => setShipCity(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select City</option>
-                  {cities.map((ci) => (
-                    <option key={ci} value={ci}>{ci}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">Street Address *</label>
+                <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Street Address *</label>
                 <textarea
                   required
                   placeholder="Flat No, Building, Street Name..."
                   value={shipAddress}
                   onChange={(e) => setShipAddress(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-455 focus:outline-none h-16 resize-none text-slate-850"
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none h-12 resize-none text-slate-850"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-655 mb-1">Pincode / ZIP * </label>
+                <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Pincode / ZIP * </label>
                 <input
-                  type="text"
+                  type="tel"
                   required
-onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-450 focus:outline-none text-slate-850"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="6-digit Pincode"
+                  value={shipPincode}
+                  onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-450 focus:outline-none text-slate-850"
                 />
               </div>
+
               <button
                 type="submit"
-                className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2.5 rounded-lg transition-colors shadow-md mt-4 text-sm"
+                className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-1.5 rounded-lg transition-colors shadow-md mt-2 text-xs"
               >
                 Proceed to Payment
               </button>
@@ -3903,46 +3910,73 @@ onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
               </a>
             </div>
 
-            {/* Copy UPI ID card */}
-            <div className="bg-rose-50/55 border border-rose-100 p-2 rounded-xl mb-3 text-xs space-y-1.5 text-left">
-              <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold text-center">Payment UPI ID</div>
-              <div className="flex flex-col gap-1.5">
+            {/* Copy UPI ID & Phone Number card */}
+            <div className="bg-rose-50/55 border border-rose-100 p-2 rounded-xl mb-3 text-xs space-y-2 text-left">
+              <div className="text-[10px] text-slate-455 uppercase tracking-widest font-semibold text-center border-b border-rose-100/40 pb-1">Payment Options (No Decline)</div>
+
+              {/* Option A: Pay to Phone Number */}
+              <div className="space-y-1">
+                <div className="text-[9px] text-slate-500 font-bold">Option 1: Pay to Phone Number</div>
+                <div className="flex items-center justify-between gap-1.5 bg-white border border-rose-100 p-1.5 rounded-lg">
+                  <span className="font-bold text-slate-700 font-mono text-xs select-all">7890784816</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('7890784816');
+                      showToast('Phone Number copied!', 'success');
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold px-2 py-0.5 rounded transition-colors shrink-0"
+                  >
+                    📋 Copy Phone
+                  </button>
+                </div>
+              </div>
+
+              {/* Option B: Pay to UPI ID */}
+              <div className="space-y-1">
+                <div className="text-[9px] text-slate-500 font-bold">Option 2: Pay to UPI ID</div>
+                <div className="flex items-center justify-between gap-1.5 bg-white border border-rose-100 p-1.5 rounded-lg">
+                  <span className="font-bold text-slate-700 font-mono text-[10px] select-all truncate">7890784816-3@ybl</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('7890784816-3@ybl');
+                      showToast('UPI ID copied!', 'success');
+                    }}
+                    className="bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-bold px-2 py-0.5 rounded transition-colors shrink-0"
+                  >
+                    📋 Copy ID
+                  </button>
+                </div>
+              </div>
+
+              {/* Option C: Open UPI Apps */}
+              <div className="space-y-1 border-t border-rose-100/40 pt-1.5">
+                <div className="text-[9px] text-slate-500 font-bold mb-1">Step 2: Open App & Paste Details to Pay</div>
                 <div className="flex gap-1 justify-center">
                   <a
-                    href="phonepe://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL"
+                    href="phonepe://"
                     className="flex-1 bg-violet-600 hover:bg-violet-750 text-white text-[8px] font-bold py-1 rounded transition-colors text-center flex items-center justify-center gap-0.5"
                   >
                     🟣 PhonePe
                   </a>
                   <a
-                    href="gpay://upi/pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL"
+                    href="gpay://"
                     className="flex-1 bg-blue-600 hover:bg-blue-750 text-white text-[8px] font-bold py-1 rounded transition-colors text-center flex items-center justify-center gap-0.5"
                   >
                     🔵 GPay
                   </a>
                   <a
-                    href="paytmmp://pay?pa=7890784816-3@ybl&pn=RANU%20DAS%20PAL"
+                    href="paytmmp://"
                     className="flex-1 bg-cyan-600 hover:bg-cyan-750 text-white text-[8px] font-bold py-1 rounded transition-colors text-center flex items-center justify-center gap-0.5"
                   >
                     🟢 Paytm
                   </a>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText('7890784816-3@ybl');
-                    showToast('UPI ID copied to clipboard!', 'success');
-                  }}
-                  className="w-full bg-rose-600 hover:bg-rose-500 text-white text-[9px] font-bold py-1 rounded transition-colors flex items-center justify-center gap-0.5"
-                >
-                  📋 Copy UPI ID: 7890784816-3@ybl
-                </button>
               </div>
-              <div className="text-[8px] text-amber-700 font-semibold text-center bg-amber-50 p-1 rounded border border-amber-100">
-                ⚠️ If app fails, copy ID and paste it in PhonePe, GPay, Paytm.
-              </div>
+
               {sellerInfoEnabled && (
-                <div className="text-[9px] text-slate-500 border-t border-rose-100/40 pt-0.5 mt-0.5 font-medium text-center">
+                <div className="text-[9px] text-slate-550 border-t border-rose-100/40 pt-1 mt-1 font-medium text-center">
                   Seller: <strong>Ranu Das Pal</strong> (7890784816)
                 </div>
               )}
@@ -4899,7 +4933,7 @@ onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
               </div>
               <h3 className="text-lg font-bold font-serif mb-1 text-slate-800 text-center">Delete Category?</h3>
               <p className="text-xs text-slate-500 mb-4 leading-relaxed text-center">
-                Are you sure you want to delete the category <strong className="text-rose-600">"{catToDelete?.name}"</strong>? 
+                Are you sure you want to delete the category <strong className="text-rose-600">"{catToDelete?.name}"</strong>?
                 Products using this category will remain, but they won't belong to a valid category.
               </p>
 
