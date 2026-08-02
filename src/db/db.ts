@@ -97,11 +97,30 @@ export interface Announcement {
 export interface EventItem {
   id: string;
   title: string;
-  type: 'live' | 'exhibition' | 'product_launch' | 'biggest_offer' | 'other';
+  type: string; // dynamic — sourced from eventTypes table
   eventDate: string;
   eventEndDate?: string; // Scheduled End Date
   description: string;
   linkUrl?: string;
+  createdAt: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface Festival {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface EventType {
+  id: string;
+  name: string;   // internal key e.g. "live"
+  label: string;  // display label e.g. "Live Show Link"
   createdAt: number;
 }
 
@@ -113,6 +132,8 @@ class OfflineEcommerceDB extends Dexie {
   announcements!: Table<Announcement, string>;
   events!: Table<EventItem, string>;
   categories!: Table<Category, string>;
+  festivals!: Table<Festival, string>;
+  eventTypes!: Table<EventType, string>;
 
   constructor() {
     super('OfflineEcommerceDB');
@@ -143,13 +164,20 @@ class OfflineEcommerceDB extends Dexie {
       events: 'id, eventDate',
       categories: 'id, name'
     });
-  }
-}
 
-export interface Category {
-  id: string;
-  name: string;
-  createdAt: number;
+    // Version 5: Add festivals and eventTypes tables for dynamic admin management
+    this.version(5).stores({
+      users: '++id, &phone',
+      products: 'id, category',
+      cart: '++id, productId',
+      orders: '++id, status, receiptId',
+      announcements: 'id',
+      events: 'id, eventDate',
+      categories: 'id, name',
+      festivals: 'id, name',
+      eventTypes: 'id, name'
+    });
+  }
 }
 
 export const db = new OfflineEcommerceDB();
@@ -167,6 +195,51 @@ db.open().then(async () => {
     }));
     await db.categories.bulkPut(categoriesToInsert);
     console.log("Pre-populated default categories in database.");
+  }
+
+  // Pre-populate default festivals if festivals table is empty
+  const defaultFestivals = [
+    'January Sale', 'February Sale', 'March Sale', 'April Sale',
+    'May Sale', 'June Sale', 'July Sale', 'August Sale',
+    'September Sale', 'October Sale', 'November Sale', 'December Sale',
+    'Durga Puja', 'Diwali', 'Eid', 'Holi', 'Christmas',
+    'Raksha Bandhan', 'Dussehra', 'Navratri',
+    'Pongal / Makar Sankranti', 'Ganesh Chaturthi',
+    'Independence Day Sale', 'Republic Day Sale', 'Gandhi Jayanti Sale',
+    'Onam (Kerala)', 'Bihu (Assam)', 'Chhath Puja (Bihar/UP)',
+    'Lohri (Punjab)', 'Baisakhi (Punjab)',
+    'Ugadi (Andhra/Karnataka)', 'Gudi Padwa (Maharashtra)',
+    'Karwa Chauth', 'Maha Shivratri', 'Krishna Janmashtami'
+  ];
+  const existingFestivalsCount = await db.festivals.count();
+  if (existingFestivalsCount === 0) {
+    const festivalsToInsert = defaultFestivals.map(f => ({
+      id: 'fest_' + f.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      name: f,
+      createdAt: Date.now()
+    }));
+    await db.festivals.bulkPut(festivalsToInsert);
+    console.log("Pre-populated default festivals in database.");
+  }
+
+  // Pre-populate default event types if eventTypes table is empty
+  const defaultEventTypes = [
+    { name: 'live',            label: 'Live Show Link' },
+    { name: 'exhibition',      label: 'Exhibition Pop-Up' },
+    { name: 'product_launch',  label: 'Product Launch' },
+    { name: 'biggest_offer',   label: 'Biggest Offer' },
+    { name: 'other',           label: 'Other Boutique Event' },
+  ];
+  const existingEventTypesCount = await db.eventTypes.count();
+  if (existingEventTypesCount === 0) {
+    const eventTypesToInsert = defaultEventTypes.map(et => ({
+      id: 'evtype_' + et.name,
+      name: et.name,
+      label: et.label,
+      createdAt: Date.now()
+    }));
+    await db.eventTypes.bulkPut(eventTypesToInsert);
+    console.log("Pre-populated default event types in database.");
   }
 
   const allowedCategoriesList = await db.categories.toArray();
@@ -213,4 +286,3 @@ db.open().then(async () => {
 }).catch(err => {
   console.error("Failed to open db or clean/populate products: ", err);
 });
-

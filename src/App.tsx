@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
-import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize, type ColorVariant, type Category } from './db/db';
-import { loginUser, registerUser } from './services/auth';
+import { db, type Product, type Order, type Announcement, type EventItem, type ProductSize, type ColorVariant, type Category, type Festival, type EventType } from './db/db';
+import { loginUser, registerUser, hashPIN } from './services/auth';
 import { useLiveQuery } from 'dexie-react-hooks';
 import moment from 'moment';
 import {
@@ -23,10 +23,17 @@ import {
   pullEventsFromCloud,
   syncCategoryToCloud,
   deleteCategoryFromCloud,
-  pullCategoriesFromCloud
+  pullCategoriesFromCloud,
+  syncUserToCloud,
+  syncFestivalToCloud,
+  deleteFestivalFromCloud,
+  pullFestivalsFromCloud,
+  syncEventTypeToCloud,
+  deleteEventTypeFromCloud,
+  pullEventTypesFromCloud
 } from './services/supabase';
 
-type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders';
+type Page = 'home' | 'catalog' | 'cart' | 'login' | 'register' | 'admin' | 'my-orders' | 'contact';
 
 const ADMIN_PHONES = ['7890784816', '7059782504'];
 const isAdmin = (phone: string | undefined) => {
@@ -35,43 +42,7 @@ const isAdmin = (phone: string | undefined) => {
   return ADMIN_PHONES.some(adminPhone => cleanPhone.endsWith(adminPhone));
 };
 
-const FESTIVAL_OPTIONS = [
-  'January Sale',
-  'February Sale',
-  'March Sale',
-  'April Sale',
-  'May Sale',
-  'June Sale',
-  'July Sale',
-  'August Sale',
-  'September Sale',
-  'October Sale',
-  'November Sale',
-  'December Sale',
-  'Durga Puja',
-  'Diwali',
-  'Eid',
-  'Holi',
-  'Christmas',
-  'Raksha Bandhan',
-  'Dussehra',
-  'Navratri',
-  'Pongal / Makar Sankranti',
-  'Ganesh Chaturthi',
-  'Independence Day Sale',
-  'Republic Day Sale',
-  'Gandhi Jayanti Sale',
-  'Onam (Kerala)',
-  'Bihu (Assam)',
-  'Chhath Puja (Bihar/UP)',
-  'Lohri (Punjab)',
-  'Baisakhi (Punjab)',
-  'Ugadi (Andhra/Karnataka)',
-  'Gudi Padwa (Maharashtra)',
-  'Karwa Chauth',
-  'Maha Shivratri',
-  'Krishna Janmashtami'
-];
+// Festival options and event types are now loaded dynamically from the database
 
 const LOCATION_DATA: Record<string, Record<string, string[]>> = {
   'India': {
@@ -195,7 +166,7 @@ export default function App() {
   const [showBigNotice, setShowBigNotice] = useState(true);
 
   const [eventTitle, setEventTitle] = useState('');
-  const [eventType, setEventType] = useState<'live' | 'exhibition' | 'product_launch' | 'biggest_offer' | 'other'>('live');
+  const [eventType, setEventType] = useState<string>('live'); // Sourced dynamically from eventTypes DB
   const [eventDate, setEventDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
   const [eventDescription, setEventDescription] = useState('');
@@ -204,7 +175,7 @@ export default function App() {
 
   // Admin Dashboard Active Tab State
   // tabs: 'dashboard' | 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'
-  const [adminActiveTab, setAdminActiveTab] = useState<'dashboard' | 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'>('dashboard');
+  const [adminActiveTab, setAdminActiveTab] = useState<'dashboard' | 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'festivals' | 'event_types' | 'settings'>('dashboard');
 
   // Admin Categories state
   const [categoryNameInput, setCategoryNameInput] = useState('');
@@ -212,6 +183,37 @@ export default function App() {
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [categoryToDeleteId, setCategoryToDeleteId] = useState<string | null>(null);
 
+  // Admin Festivals state
+  const [festivalNameInput, setFestivalNameInput] = useState('');
+  const [editingFestivalId, setEditingFestivalId] = useState<string | null>(null);
+  const [editingFestivalName, setEditingFestivalName] = useState('');
+  const [festivalToDeleteId, setFestivalToDeleteId] = useState<string | null>(null);
+
+  // Admin Event Types state
+  const [eventTypeNameInput, setEventTypeNameInput] = useState('');
+  const [eventTypeLabelInput, setEventTypeLabelInput] = useState('');
+  const [editingEventTypeId, setEditingEventTypeId] = useState<string | null>(null);
+  const [editingEventTypeName, setEditingEventTypeName] = useState('');
+  const [editingEventTypeLabel, setEditingEventTypeLabel] = useState('');
+  const [eventTypeToDeleteId, setEventTypeToDeleteId] = useState<string | null>(null);
+
+
+  // User Profile States
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileNameInput, setProfileNameInput] = useState('');
+  const [profileCurrentPin, setProfileCurrentPin] = useState('');
+  const [profileNewPin, setProfileNewPin] = useState('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+  // Contact Us Form States
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactCategory, setContactCategory] = useState('General Query');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactAdminTarget, setContactAdminTarget] = useState('7890784816'); // default to Admin 1
+
+  // Scroll to top state
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -237,6 +239,8 @@ export default function App() {
   const announcementsList = useLiveQuery(() => db.announcements.toArray()) || [];
   const eventsList = useLiveQuery(() => db.events.toArray()) || [];
   const categoriesList = useLiveQuery(() => db.categories.toArray()) || [];
+  const festivalsList = useLiveQuery(() => db.festivals.orderBy('name').toArray()) || [];
+  const eventTypesList = useLiveQuery(() => db.eventTypes.toArray()) || [];
 
   // Automatically redirect based on user authentication state (Allowing 'home' tab view first)
   useEffect(() => {
@@ -246,6 +250,37 @@ export default function App() {
     setCurrentPage('home');
     //}
   }, [user]);
+  // Synchronize profile form input values
+  useEffect(() => {
+    if (user) {
+      setProfileNameInput(user.name);
+    } else {
+      setProfileNameInput('');
+    }
+    setProfileCurrentPin('');
+    setProfileNewPin('');
+    setIsEditingProfile(false);
+  }, [user, isProfileOpen]);
+
+  // Prepopulate Contact form fields from auth user context
+  useEffect(() => {
+    if (user) {
+      setContactName(user.name);
+      setContactPhone(user.phone);
+    }
+  }, [user]);
+  // Monitor page scrolling to display the floating scroll-to-top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Safeguard: Preselect first valid database category if selected one is removed or uninitialized
   useEffect(() => {
@@ -349,6 +384,22 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Cloud categories sync failed: ", err);
+        });
+
+      pullFestivalsFromCloud()
+        .then((count) => {
+          console.log(`Successfully synchronized ${count} festivals from Cloud Database.`);
+        })
+        .catch((err) => {
+          console.error("Cloud festivals sync failed: ", err);
+        });
+
+      pullEventTypesFromCloud()
+        .then((count) => {
+          console.log(`Successfully synchronized ${count} event types from Cloud Database.`);
+        })
+        .catch((err) => {
+          console.error("Cloud event types sync failed: ", err);
         });
 
       // Subscribe to live database updates (Supabase Realtime)
@@ -572,6 +623,43 @@ export default function App() {
           })
           .subscribe();
 
+        // Festivals realtime subscription
+        const festivalsChannel = supabase
+          .channel('realtime-festivals')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'festivals' }, async (payload) => {
+            console.log('Realtime festival change: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.festivals.delete(payload.old.id);
+            } else {
+              const item = payload.new;
+              await db.festivals.put({
+                id: item.id,
+                name: item.name,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
+          })
+          .subscribe();
+
+        // Event Types realtime subscription
+        const eventTypesChannel = supabase
+          .channel('realtime-event-types')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'event_types' }, async (payload) => {
+            console.log('Realtime event type change: ', payload);
+            if (payload.eventType === 'DELETE') {
+              await db.eventTypes.delete(payload.old.id);
+            } else {
+              const item = payload.new;
+              await db.eventTypes.put({
+                id: item.id,
+                name: item.name,
+                label: item.label,
+                createdAt: new Date(item.created_at).getTime()
+              });
+            }
+          })
+          .subscribe();
+
         return () => {
           supabase.removeChannel(productsChannel);
           supabase.removeChannel(settingsChannel);
@@ -579,6 +667,8 @@ export default function App() {
           supabase.removeChannel(announcementsChannel);
           supabase.removeChannel(eventsChannel);
           supabase.removeChannel(categoriesChannel);
+          supabase.removeChannel(festivalsChannel);
+          supabase.removeChannel(eventTypesChannel);
         };
       }
     }
@@ -1397,6 +1487,228 @@ export default function App() {
   };
 
 
+  // Admin add festival
+  const handleAddFestival = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!festivalNameInput.trim()) return;
+    setIsLoading(true);
+    try {
+      const newFestival: Festival = {
+        id: 'fest_' + festivalNameInput.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now(),
+        name: festivalNameInput.trim(),
+        createdAt: Date.now()
+      };
+      await db.festivals.put(newFestival);
+      if (isCloudConfigured()) {
+        await syncFestivalToCloud(newFestival);
+      }
+      showToast('Festival added successfully!', 'success');
+      setFestivalNameInput('');
+    } catch (err) {
+      showToast('Failed to add festival.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin update festival
+  const handleUpdateFestival = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFestivalId || !editingFestivalName.trim()) return;
+    setIsLoading(true);
+    try {
+      const festObj = await db.festivals.get(editingFestivalId);
+      if (festObj) {
+        const updated = { ...festObj, name: editingFestivalName.trim() };
+        await db.festivals.put(updated);
+        if (isCloudConfigured()) {
+          await syncFestivalToCloud(updated);
+        }
+        showToast('Festival updated successfully!', 'success');
+      }
+      setEditingFestivalId(null);
+      setEditingFestivalName('');
+    } catch (err) {
+      showToast('Failed to update festival.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin delete festival
+  const handleDeleteFestival = async (festId: string) => {
+    setIsLoading(true);
+    try {
+      await db.festivals.delete(festId);
+      if (isCloudConfigured()) {
+        await deleteFestivalFromCloud(festId);
+      }
+      showToast('Festival deleted.', 'success');
+      setFestivalToDeleteId(null);
+    } catch (err) {
+      showToast('Failed to delete festival.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin add event type
+  const handleAddEventType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventTypeNameInput.trim() || !eventTypeLabelInput.trim()) return;
+    setIsLoading(true);
+    try {
+      const newET: EventType = {
+        id: 'evtype_' + eventTypeNameInput.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now(),
+        name: eventTypeNameInput.trim().toLowerCase().replace(/\s+/g, '_'),
+        label: eventTypeLabelInput.trim(),
+        createdAt: Date.now()
+      };
+      await db.eventTypes.put(newET);
+      if (isCloudConfigured()) {
+        await syncEventTypeToCloud(newET);
+      }
+      showToast('Event type added successfully!', 'success');
+      setEventTypeNameInput('');
+      setEventTypeLabelInput('');
+    } catch (err) {
+      showToast('Failed to add event type.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin update event type
+  const handleUpdateEventType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEventTypeId || !editingEventTypeName.trim() || !editingEventTypeLabel.trim()) return;
+    setIsLoading(true);
+    try {
+      const etObj = await db.eventTypes.get(editingEventTypeId);
+      if (etObj) {
+        const updated = { ...etObj, name: editingEventTypeName.trim(), label: editingEventTypeLabel.trim() };
+        await db.eventTypes.put(updated);
+        if (isCloudConfigured()) {
+          await syncEventTypeToCloud(updated);
+        }
+        showToast('Event type updated!', 'success');
+      }
+      setEditingEventTypeId(null);
+      setEditingEventTypeName('');
+      setEditingEventTypeLabel('');
+    } catch (err) {
+      showToast('Failed to update event type.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin delete event type
+  const handleDeleteEventType = async (etId: string) => {
+    setIsLoading(true);
+    try {
+      await db.eventTypes.delete(etId);
+      if (isCloudConfigured()) {
+        await deleteEventTypeFromCloud(etId);
+      }
+      showToast('Event type deleted.', 'success');
+      setEventTypeToDeleteId(null);
+    } catch (err) {
+      showToast('Failed to delete event type.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  // Submit Contact Query and redirect to WhatsApp
+  const handleSendContactQuery = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactName.trim() || !contactPhone.trim() || !contactMessage.trim()) {
+      showToast('Please fill in all required fields.', 'error');
+      return;
+    }
+
+    const message = `Hello KRP Creation,\n\nI have a query from the website.\n\n` +
+      `*Name:* ${contactName.trim()}\n` +
+      `*Phone:* ${contactPhone.trim()}\n` +
+      `*Query Category:* ${contactCategory}\n\n` +
+      `*Message details:*\n${contactMessage.trim()}\n\n` +
+      `Please get back to me. Thank you!`;
+
+    const encodedText = encodeURIComponent(message);
+
+    window.open(`https://wa.me/91${contactAdminTarget}?text=${encodedText}`, '_blank');
+    showToast('Redirecting to WhatsApp chat...', 'success');
+
+    // Reset details (except Name/Phone context if logged in)
+    setContactMessage('');
+  };
+
+
+  // Update Profile details and hash new PIN if changed
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!profileNameInput.trim()) {
+      showToast('Name cannot be empty.', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const userObj = await db.users.where('phone').equals(user.phone).first();
+      if (!userObj) {
+        showToast('Local user record not found.', 'error');
+        return;
+      }
+
+      // Verify current PIN before allowing changes
+      const currentPinHash = await hashPIN(profileCurrentPin);
+      if (userObj.pinHash !== currentPinHash) {
+        showToast('Incorrect current PIN. Cannot authorize profile update.', 'error');
+        return;
+      }
+
+      // Calculate new PIN hash or reuse current one
+      const finalPinHash = profileNewPin.trim() ? await hashPIN(profileNewPin.trim()) : userObj.pinHash;
+
+      // Update local IndexedDB
+      await db.users.update(userObj.id!, {
+        name: profileNameInput.trim(),
+        pinHash: finalPinHash
+      });
+
+      // Update cloud if connection is configured
+      if (isOnline && isCloudConfigured()) {
+        await syncUserToCloud({
+          phone: user.phone,
+          pinHash: finalPinHash,
+          name: profileNameInput.trim(),
+          createdAt: userObj.createdAt
+        });
+      }
+
+      // Update auth context state
+      setAuthSession({
+        id: userObj.id,
+        phone: user.phone,
+        name: profileNameInput.trim()
+      });
+
+      showToast('Profile updated successfully!', 'success');
+      setIsEditingProfile(false);
+      setProfileCurrentPin('');
+      setProfileNewPin('');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to update profile.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   // Print invoice handler
   const handlePrintInvoice = () => {
     window.print();
@@ -1408,7 +1720,7 @@ export default function App() {
     const adminPhone = '917890784816'; // standard country code prefix for India
     const buyerName = order.shippingInfo?.fullName || 'Customer';
     const buyerPhone = order.shippingInfo?.phone || '';
-    
+
     // Format cart details
     let itemsText = '';
     if (Array.isArray(order.items)) {
@@ -1426,7 +1738,7 @@ export default function App() {
       `*Buyer Phone:* ${buyerPhone}\n\n` +
       `*Ordered Items:*\n${itemsText}\n\n` +
       `Please verify my payment and approve the order. Thank you!`;
-    
+
     const encodedText = encodeURIComponent(message);
     window.open(`https://wa.me/${adminPhone}?text=${encodedText}`, '_blank');
   };
@@ -1578,13 +1890,35 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-100 bg-white shadow-sm">
             <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
             <span className={isOnline ? 'text-emerald-600' : 'text-rose-600'}>
               {isOnline ? 'Online' : 'Offline'}
             </span>
           </div>
+
+          {user ? (
+            <button
+              onClick={() => setIsProfileOpen(true)}
+              className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-3 py-1 rounded-full border border-rose-100 transition-colors cursor-pointer shadow-sm"
+            >
+              👤 {user.name}
+              <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-bold ${isAdmin(user.phone)
+                ? 'bg-rose-100 text-rose-700'
+                : 'bg-indigo-50 text-indigo-700'
+                }`}>
+                {isAdmin(user.phone) ? 'Admin' : 'User'}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setCurrentPage('login')}
+              className="text-xs text-rose-650 hover:text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-100 transition-all cursor-pointer shadow-sm"
+            >
+              Sign In
+            </button>
+          )}
         </div>
       </header>
 
@@ -1629,6 +1963,15 @@ export default function App() {
             </button>
           )}
 
+          {/* Contact Us tab */}
+          <button
+            onClick={() => setCurrentPage('contact')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'contact' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-550 hover:text-slate-700 hover:bg-rose-55'
+              }`}
+          >
+            Contact Us
+          </button>
+
           {/* Admin panel tab is strictly visible only to logged-in admin */}
           {isAdmin(user?.phone) && (
             <button
@@ -1646,31 +1989,6 @@ export default function App() {
           )}
         </div>
 
-        {/* User Session Info & Logout Button */}
-        {user ? (
-          <div className="flex items-center gap-2 text-xs text-slate-600 bg-rose-50/40 px-3 py-1 rounded-xl border border-rose-100/50 max-w-full overflow-hidden shrink-0">
-            <span className="font-semibold text-slate-700 truncate max-w-[100px] sm:max-w-[150px]">Hi, {user.name}</span>
-            <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-bold ${isAdmin(user.phone)
-              ? 'bg-rose-100 text-rose-700 border border-rose-200'
-              : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-              }`}>
-              {isAdmin(user.phone) ? 'Admin' : 'User'}
-            </span>
-            <button
-              onClick={logout}
-              className="bg-rose-600 hover:bg-rose-550 text-white text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors shadow-sm cursor-pointer shrink-0"
-            >
-              Logout
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setCurrentPage('login')}
-            className="text-xs text-rose-650 hover:text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg border border-rose-100 transition-all shrink-0"
-          >
-            Sign In
-          </button>
-        )}
       </nav>
 
       {/* Main Content Areas */}
@@ -1931,11 +2249,10 @@ export default function App() {
               <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none scroll-smooth">
                 <button
                   onClick={() => setSelectedCategoryFilter('')}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border cursor-pointer ${
-                    !selectedCategoryFilter
-                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
-                      : 'bg-white text-slate-600 border-rose-100 hover:bg-rose-50'
-                  }`}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border cursor-pointer ${!selectedCategoryFilter
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                    : 'bg-white text-slate-600 border-rose-100 hover:bg-rose-50'
+                    }`}
                 >
                   All Items
                 </button>
@@ -1943,11 +2260,10 @@ export default function App() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategoryFilter(cat.name)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border cursor-pointer ${
-                      selectedCategoryFilter === cat.name
-                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
-                        : 'bg-white text-slate-600 border-rose-100 hover:bg-rose-50'
-                    }`}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border cursor-pointer ${selectedCategoryFilter === cat.name
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-rose-100 hover:bg-rose-50'
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -2239,10 +2555,11 @@ export default function App() {
             {/* Floating Scroll to Top Button */}
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="fixed bottom-6 left-6 z-40 bg-rose-600 hover:bg-rose-700 text-white w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95 cursor-pointer border border-rose-450 hover:shadow-rose-600/25"
+              className={`fixed bottom-6 left-6 z-40 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-xl hover:shadow-rose-500/35 transition-all duration-350 transform active:scale-90 cursor-pointer border border-white/20 hover:-translate-y-1 ${showScrollTop ? 'scale-100 opacity-100 translate-y-0' : 'scale-0 opacity-0 translate-y-10 pointer-events-none'
+                }`}
               title="Scroll to Top"
             >
-              ▲
+              <span className="text-lg font-black leading-none animate-pulse">↑</span>
             </button>
           </div>
         )}
@@ -2451,16 +2768,16 @@ export default function App() {
                         )}
                         <span
                           className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'approved'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : order.status === 'synced'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : order.status === 'rejected'
-                                  ? 'bg-rose-50 text-rose-750 border-rose-200'
-                                  : order.status === 'cancelled'
-                                    ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                    : order.status === 'payment_pending'
-                                      ? 'bg-amber-50 text-amber-700 border-amber-300'
-                                      : 'bg-sky-50 text-sky-700 border-sky-200'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : order.status === 'synced'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : order.status === 'rejected'
+                                ? 'bg-rose-50 text-rose-750 border-rose-200'
+                                : order.status === 'cancelled'
+                                  ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                  : order.status === 'payment_pending'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                    : 'bg-sky-50 text-sky-700 border-sky-200'
                             }`}
                         >
                           {
@@ -2547,6 +2864,117 @@ export default function App() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Contact Us Page */}
+        {currentPage === 'contact' && (
+          <div className="max-w-md mx-auto bg-white border border-rose-100 rounded-2xl p-6 shadow-md animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold text-center text-slate-800 mb-1 font-serif">Contact Us</h2>
+            <p className="text-center text-slate-500 text-xs mb-6">Have any query? Send it to our admin support team directly via WhatsApp.</p>
+
+            <form onSubmit={handleSendContactQuery} className="space-y-4 text-xs text-left">
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                  Your Name <span className="text-rose-600 font-bold ml-0.5">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter your name"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-400 focus:outline-none text-slate-800 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                  Contact Phone <span className="text-rose-600 font-bold ml-0.5">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Enter your phone number"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-400 focus:outline-none text-slate-800 text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-600 mb-1">Query Type / Category</label>
+                <select
+                  value={contactCategory}
+                  onChange={(e) => setContactCategory(e.target.value)}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-400 focus:outline-none text-slate-700 text-xs"
+                >
+                  <option value="General Query">General / Other Query</option>
+                  <option value="Order Status Help">Order Status Help</option>
+                  <option value="Sizing or Stock Inquiry">Sizing or Stock Inquiry</option>
+                  <option value="Return / Exchange Help">Return / Exchange Help</option>
+                  <option value="Bulk Purchase or Special discount">Bulk / Special Requests</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                  Select Admin Representative <span className="text-rose-600 font-bold ml-0.5">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7890784816' ? 'bg-rose-50 border-rose-300 font-bold' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
+                    <input
+                      type="radio"
+                      name="admin_target"
+                      value="7890784816"
+                      checked={contactAdminTarget === '7890784816'}
+                      onChange={() => setContactAdminTarget('7890784816')}
+                      className="accent-rose-600"
+                    />
+                    <div>
+                      <div className="text-slate-800 text-[11px] leading-tight">Ranu Das</div>
+                      <div className="text-[9px] text-slate-400 font-mono">Admin 1</div>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7059782504' ? 'bg-rose-50 border-rose-300 font-bold' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
+                    <input
+                      type="radio"
+                      name="admin_target"
+                      value="7059782504"
+                      checked={contactAdminTarget === '7059782504'}
+                      onChange={() => setContactAdminTarget('7059782504')}
+                      className="accent-rose-600"
+                    />
+                    <div>
+                      <div className="text-slate-800 text-[11px] leading-tight">Support</div>
+                      <div className="text-[9px] text-slate-400 font-mono">Admin 2</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                  Query Message <span className="text-rose-600 font-bold ml-0.5">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Describe your query in detail..."
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:border-rose-400 focus:outline-none text-slate-800 text-xs"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2.5 rounded-xl transition-all shadow-md text-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+              >
+                💬 Open WhatsApp Chat
+              </button>
+            </form>
           </div>
         )}
 
@@ -2758,6 +3186,24 @@ export default function App() {
                     🏷️ Product Categories
                   </button>
                   <button
+                    onClick={() => setAdminActiveTab('festivals')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'festivals'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    🎉 Festivals
+                  </button>
+                  <button
+                    onClick={() => setAdminActiveTab('event_types')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'event_types'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    📋 Event Types
+                  </button>
+                  <button
                     onClick={() => setAdminActiveTab('settings')}
                     className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'settings'
                       ? 'bg-rose-600 text-white shadow-md'
@@ -2777,7 +3223,7 @@ export default function App() {
                     const totalRevenue = approvedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
                     const pendingCount = allOrders.filter(o => o.status === 'payment_pending').length;
                     const lowStockProds = products.filter(p => p.isActive !== false && p.stock < 5);
-                    
+
                     // Aggregate top sellers
                     const salesMap: Record<string, number> = {};
                     approvedOrders.forEach(o => {
@@ -2802,7 +3248,7 @@ export default function App() {
                             <div className="text-2xl font-black mt-2">₹{totalRevenue.toFixed(2)}</div>
                             <div className="text-[10px] opacity-75 mt-1">From {approvedOrders.length} delivered orders</div>
                           </div>
-                          
+
                           <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
                             <div>
                               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Orders</div>
@@ -2978,8 +3424,8 @@ export default function App() {
                                   className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
                                 >
                                   <option value="">None / Standard</option>
-                                  {FESTIVAL_OPTIONS.map(f => (
-                                    <option key={f} value={f}>{f}</option>
+                                  {festivalsList.map(f => (
+                                    <option key={f.id} value={f.name}>{f.name}</option>
                                   ))}
                                 </select>
                               </div>
@@ -3367,16 +3813,16 @@ export default function App() {
                                   )}
                                   <span
                                     className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${order.status === 'approved'
-                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                        : order.status === 'synced'
-                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                          : order.status === 'rejected'
-                                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                            : order.status === 'cancelled'
-                                              ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                              : order.status === 'payment_pending'
-                                                ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
-                                                : 'bg-sky-50 text-sky-700 border-sky-200'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : order.status === 'synced'
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                        : order.status === 'rejected'
+                                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                          : order.status === 'cancelled'
+                                            ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                            : order.status === 'payment_pending'
+                                              ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
+                                              : 'bg-sky-50 text-sky-700 border-sky-200'
                                       }`}
                                   >
                                     {
@@ -3542,14 +3988,20 @@ export default function App() {
                               <label className="block text-slate-600 mb-1">Event Type</label>
                               <select
                                 value={eventType}
-                                onChange={(e) => setEventType(e.target.value as any)}
+                                onChange={(e) => setEventType(e.target.value)}
                                 className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:outline-none focus:border-rose-400 text-slate-800"
                               >
-                                <option value="live">Live Show Link</option>
-                                <option value="exhibition">Exhibition Pop-Up</option>
-                                <option value="product_launch">Product Launch</option>
-                                <option value="biggest_offer">Biggest Offer</option>
-                                <option value="other">Other Boutique Event</option>
+                                {eventTypesList.length > 0 ? eventTypesList.map(et => (
+                                  <option key={et.id} value={et.name}>{et.label}</option>
+                                )) : (
+                                  <>
+                                    <option value="live">Live Show Link</option>
+                                    <option value="exhibition">Exhibition Pop-Up</option>
+                                    <option value="product_launch">Product Launch</option>
+                                    <option value="biggest_offer">Biggest Offer</option>
+                                    <option value="other">Other Boutique Event</option>
+                                  </>
+                                )}
                               </select>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
@@ -3767,6 +4219,182 @@ export default function App() {
                                   >
                                     Delete
                                   </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FESTIVALS MANAGEMENT TAB */}
+                  {adminActiveTab === 'festivals' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Left: Create / Edit Festival Form */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4 h-fit">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">
+                          {editingFestivalId ? 'Edit Festival' : 'Add New Festival'}
+                        </h3>
+                        {editingFestivalId ? (
+                          <form onSubmit={handleUpdateFestival} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Festival Name</label>
+                              <input
+                                type="text"
+                                required
+                                value={editingFestivalName}
+                                onChange={(e) => setEditingFestivalName(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button type="submit" className="bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 px-4 rounded-lg shadow-sm">Save Changes</button>
+                              <button type="button" onClick={() => { setEditingFestivalId(null); setEditingFestivalName(''); }} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg">Cancel</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleAddFestival} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Festival Name</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Eid Sale, New Year Offer..."
+                                value={festivalNameInput}
+                                onChange={(e) => setFestivalNameInput(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850"
+                              />
+                            </div>
+                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg shadow-sm">+ Add Festival</button>
+                          </form>
+                        )}
+                      </div>
+
+                      {/* Right: Festival List */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-3">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">All Festivals <span className="text-sm font-normal text-slate-400">({festivalsList.length})</span></h3>
+                        {festivalsList.length === 0 ? (
+                          <p className="text-slate-400 text-xs">No festivals found. Add one above.</p>
+                        ) : (
+                          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                            {festivalsList.map(fest => (
+                              <div key={fest.id} className="flex items-center justify-between bg-rose-50/20 border border-rose-100/60 rounded-xl px-3 py-2.5 text-xs">
+                                <span className="font-semibold text-slate-700">🎉 {fest.name}</span>
+                                <div className="flex gap-1.5">
+                                  {festivalToDeleteId === fest.id ? (
+                                    <>
+                                      <span className="text-rose-600 font-semibold text-[10px] self-center">Confirm?</span>
+                                      <button onClick={() => handleDeleteFestival(fest.id)} className="bg-rose-600 text-white px-2 py-1 rounded text-[10px] font-bold">Yes</button>
+                                      <button onClick={() => setFestivalToDeleteId(null)} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">No</button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button onClick={() => { setEditingFestivalId(fest.id); setEditingFestivalName(fest.name); }} className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded font-semibold">Edit</button>
+                                      <button onClick={() => setFestivalToDeleteId(fest.id)} className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold">Delete</button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* EVENT TYPES MANAGEMENT TAB */}
+                  {adminActiveTab === 'event_types' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Left: Create / Edit Event Type Form */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4 h-fit">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">
+                          {editingEventTypeId ? 'Edit Event Type' : 'Add New Event Type'}
+                        </h3>
+                        {editingEventTypeId ? (
+                          <form onSubmit={handleUpdateEventType} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Internal Key <span className="text-rose-600">*</span></label>
+                              <input
+                                type="text"
+                                required
+                                value={editingEventTypeName}
+                                onChange={(e) => setEditingEventTypeName(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Display Label <span className="text-rose-600">*</span></label>
+                              <input
+                                type="text"
+                                required
+                                value={editingEventTypeLabel}
+                                onChange={(e) => setEditingEventTypeLabel(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button type="submit" className="bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 px-4 rounded-lg shadow-sm">Save Changes</button>
+                              <button type="button" onClick={() => { setEditingEventTypeId(null); setEditingEventTypeName(''); setEditingEventTypeLabel(''); }} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg">Cancel</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleAddEventType} className="space-y-4 text-xs">
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Internal Key <span className="text-rose-600">*</span></label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. flash_sale, popup_event"
+                                value={eventTypeNameInput}
+                                onChange={(e) => setEventTypeNameInput(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850 font-mono"
+                              />
+                              <p className="text-slate-400 text-[10px] mt-0.5">Used internally as an identifier (no spaces).</p>
+                            </div>
+                            <div>
+                              <label className="block text-slate-655 font-bold mb-1">Display Label <span className="text-rose-600">*</span></label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Flash Sale, Pop-Up Show"
+                                value={eventTypeLabelInput}
+                                onChange={(e) => setEventTypeLabelInput(e.target.value)}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 focus:outline-none focus:border-rose-400 text-slate-850"
+                              />
+                              <p className="text-slate-400 text-[10px] mt-0.5">Shown to admin in the events type dropdown.</p>
+                            </div>
+                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-2 rounded-lg shadow-sm">+ Add Event Type</button>
+                          </form>
+                        )}
+                      </div>
+
+                      {/* Right: Event Types List */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-3">
+                        <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">All Event Types <span className="text-sm font-normal text-slate-400">({eventTypesList.length})</span></h3>
+                        {eventTypesList.length === 0 ? (
+                          <p className="text-slate-400 text-xs">No event types found. Add one above.</p>
+                        ) : (
+                          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                            {eventTypesList.map(et => (
+                              <div key={et.id} className="flex items-center justify-between bg-rose-50/20 border border-rose-100/60 rounded-xl px-3 py-2.5 text-xs">
+                                <div>
+                                  <span className="font-semibold text-slate-700">📋 {et.label}</span>
+                                  <span className="ml-2 text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded">{et.name}</span>
+                                </div>
+                                <div className="flex gap-1.5">
+                                  {eventTypeToDeleteId === et.id ? (
+                                    <>
+                                      <span className="text-rose-600 font-semibold text-[10px] self-center">Confirm?</span>
+                                      <button onClick={() => handleDeleteEventType(et.id)} className="bg-rose-600 text-white px-2 py-1 rounded text-[10px] font-bold">Yes</button>
+                                      <button onClick={() => setEventTypeToDeleteId(null)} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">No</button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button onClick={() => { setEditingEventTypeId(et.id); setEditingEventTypeName(et.name); setEditingEventTypeLabel(et.label); }} className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded font-semibold">Edit</button>
+                                      <button onClick={() => setEventTypeToDeleteId(et.id)} className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold">Delete</button>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -4465,6 +5093,123 @@ export default function App() {
         </div>
       )}
 
+      {/* User Profile Modal */}
+      {isProfileOpen && user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
+          <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800 p-5 space-y-4">
+            <button
+              onClick={() => {
+                setIsProfileOpen(false);
+                setIsEditingProfile(false);
+              }}
+              className="absolute top-3 right-3 bg-rose-50 hover:bg-rose-100 text-rose-700 w-6 h-6 rounded-full flex items-center justify-center font-bold transition-colors border border-rose-100 text-xs"
+            >
+              ✕
+            </button>
+            <h3 className="text-base font-bold text-slate-850 border-b border-rose-50 pb-2 flex items-center gap-1.5 font-serif">
+              👤 User Profile
+            </h3>
+
+            {!isEditingProfile ? (
+              <div className="space-y-4">
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-rose-50/50">
+                    <span className="text-slate-400 font-semibold">Name:</span>
+                    <span className="font-bold text-slate-800">{user.name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-rose-50/50">
+                    <span className="text-slate-400 font-semibold">Phone:</span>
+                    <span className="font-bold text-slate-800 font-mono">{user.phone}</span>
+                  </div>
+                  {isAdmin(user.phone) && (
+                    <div className="flex justify-between py-1 border-b border-rose-50/50">
+                      <span className="text-slate-400 font-semibold">Role:</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
+                        Admin Account
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setIsEditingProfile(true)}
+                    className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2 rounded-xl transition-all border border-rose-100 text-xs flex items-center justify-center gap-1"
+                  >
+                    ✏️ Edit Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsProfileOpen(false);
+                    }}
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-xl transition-all text-xs flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleUpdateProfile} className="space-y-3.5 text-xs text-left">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileNameInput}
+                    onChange={(e) => setProfileNameInput(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-1">Confirm Current PIN (Required to authorize)</label>
+                  <input
+                    type="password"
+                    required
+                    maxLength={4}
+                    placeholder="Enter 4-digit PIN"
+                    value={profileCurrentPin}
+                    onChange={(e) => setProfileCurrentPin(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none font-mono tracking-widest text-center"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-1">New PIN (Optional - Leave blank to keep current)</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    placeholder="Enter new 4-digit PIN"
+                    value={profileNewPin}
+                    onChange={(e) => setProfileNewPin(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none font-mono tracking-widest text-center"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingProfile(false);
+                      setProfileCurrentPin('');
+                      setProfileNewPin('');
+                    }}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl transition-all text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-555 text-white font-bold py-2 rounded-xl transition-all text-xs shadow-md"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Product Detail Modal (Shows and lets customers add reviews) */}
       {selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
@@ -4880,8 +5625,8 @@ export default function App() {
                       className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2.5 text-sm focus:border-rose-450 focus:outline-none"
                     >
                       <option value="">None / Standard</option>
-                      {FESTIVAL_OPTIONS.map(f => (
-                        <option key={f} value={f}>{f}</option>
+                      {festivalsList.map(f => (
+                        <option key={f.id} value={f.name}>{f.name}</option>
                       ))}
                     </select>
                   </div>

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { db, type Product, type Order, type Announcement, type EventItem, type Category } from '../db/db';
+import { db, type Product, type Order, type Announcement, type EventItem, type Category, type Festival, type EventType } from '../db/db';
 
 const DEFAULT_SUPABASE_URL = 'https://ggbevhaudwhbpevjbdhq.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYmV2aGF1ZHdoYnBldmpiZGhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODc5ODYsImV4cCI6MjEwMDU2Mzk4Nn0.bFaffDeWkkLq0I3fHOGNvUa-8jV-wjXvsa7IR2-IDBI';
@@ -445,8 +445,184 @@ export const pullCategoriesFromCloud = async (): Promise<number> => {
       createdAt: new Date(item.created_at).getTime()
     }));
     await db.categories.bulkPut(formatted);
+  }
+  return 0;
+};
+
+// Push user profile to cloud
+export const syncUserToCloud = async (user: { phone: string; pinHash: string; name: string; createdAt: number }) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('app_users')
+    .upsert({
+      phone: user.phone,
+      pin_hash: user.pinHash,
+      name: user.name,
+      created_at: new Date(user.createdAt).toISOString()
+    }, { onConflict: 'phone' });
+
+  if (error) {
+    console.error("Failed to push user to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Fetch user profile from cloud by phone number
+export const fetchUserFromCloud = async (phone: string): Promise<{ phone: string; pinHash: string; name: string; createdAt: number } | null> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('*')
+    .eq('phone', phone)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch user from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data) {
+    return {
+      phone: data.phone,
+      pinHash: data.pin_hash,
+      name: data.name,
+      createdAt: new Date(data.created_at).getTime()
+    };
+  }
+  return null;
+};
+
+// ─── Festivals ───────────────────────────────────────────────────────────────
+
+// Sync a festival to cloud
+export const syncFestivalToCloud = async (festival: Festival) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('festivals')
+    .upsert({
+      id: festival.id,
+      name: festival.name,
+      created_at: new Date(festival.createdAt).toISOString()
+    });
+
+  if (error) {
+    console.error("Failed to sync festival to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Delete a festival from cloud
+export const deleteFestivalFromCloud = async (festivalId: string) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('festivals')
+    .delete()
+    .eq('id', festivalId);
+
+  if (error) {
+    console.error("Failed to delete festival from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Pull all festivals from cloud
+export const pullFestivalsFromCloud = async (): Promise<number> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from('festivals')
+    .select('*');
+
+  if (error) {
+    console.error("Failed to pull festivals from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data && data.length > 0) {
+    const formatted = data.map(item => ({
+      id: item.id,
+      name: item.name,
+      createdAt: new Date(item.created_at).getTime()
+    }));
+    await db.festivals.bulkPut(formatted);
     return data.length;
   }
   return 0;
 };
+
+// ─── Event Types ─────────────────────────────────────────────────────────────
+
+// Sync an event type to cloud
+export const syncEventTypeToCloud = async (et: EventType) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('event_types')
+    .upsert({
+      id: et.id,
+      name: et.name,
+      label: et.label,
+      created_at: new Date(et.createdAt).toISOString()
+    });
+
+  if (error) {
+    console.error("Failed to sync event type to cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Delete an event type from cloud
+export const deleteEventTypeFromCloud = async (etId: string) => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('event_types')
+    .delete()
+    .eq('id', etId);
+
+  if (error) {
+    console.error("Failed to delete event type from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Pull all event types from cloud
+export const pullEventTypesFromCloud = async (): Promise<number> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+
+  const { data, error } = await supabase
+    .from('event_types')
+    .select('*');
+
+  if (error) {
+    console.error("Failed to pull event types from cloud: ", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data && data.length > 0) {
+    const formatted = data.map(item => ({
+      id: item.id,
+      name: item.name,
+      label: item.label,
+      createdAt: new Date(item.created_at).getTime()
+    }));
+    await db.eventTypes.bulkPut(formatted);
+    return data.length;
+  }
+  return 0;
+};
+
+
 
