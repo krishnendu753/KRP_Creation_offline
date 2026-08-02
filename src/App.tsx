@@ -203,8 +203,8 @@ export default function App() {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   // Admin Dashboard Active Tab State
-  // tabs: 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'
-  const [adminActiveTab, setAdminActiveTab] = useState<'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'>('inventory');
+  // tabs: 'dashboard' | 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'
+  const [adminActiveTab, setAdminActiveTab] = useState<'dashboard' | 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'>('dashboard');
 
   // Admin Categories state
   const [categoryNameInput, setCategoryNameInput] = useState('');
@@ -221,6 +221,8 @@ export default function App() {
   const [filterSize, setFilterSize] = useState<string>('');
   const [filterMaxPrice, setFilterMaxPrice] = useState<string>('');
   const [filterMinRating, setFilterMinRating] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
   // Global UI States (Loader & Toast)
   const [isLoading, setIsLoading] = useState(false);
@@ -1400,6 +1402,36 @@ export default function App() {
     window.print();
   };
 
+
+  // WhatsApp Order notifier helper
+  const handleSendWhatsAppOrder = (order: Order) => {
+    const adminPhone = '917890784816'; // standard country code prefix for India
+    const buyerName = order.shippingInfo?.fullName || 'Customer';
+    const buyerPhone = order.shippingInfo?.phone || '';
+    
+    // Format cart details
+    let itemsText = '';
+    if (Array.isArray(order.items)) {
+      itemsText = order.items.map(item => {
+        const matchingProd = products.find(p => p.id === item.productId);
+        const name = matchingProd ? matchingProd.name : 'Unknown Product';
+        return `- ${name} (x${item.quantity}) - Size: ${item.selectedSize?.size || 'Standard'}`;
+      }).join('\n');
+    }
+
+    const message = `Hello KRP Creation,\n\nI have submitted an order on your store.\n\n` +
+      `*Order Reference:* ${order.receiptId}\n` +
+      `*Total Amount:* ₹${order.totalAmount.toFixed(2)}\n` +
+      `*Buyer Name:* ${buyerName}\n` +
+      `*Buyer Phone:* ${buyerPhone}\n\n` +
+      `*Ordered Items:*\n${itemsText}\n\n` +
+      `Please verify my payment and approve the order. Thank you!`;
+    
+    const encodedText = encodeURIComponent(message);
+    window.open(`https://wa.me/${adminPhone}?text=${encodedText}`, '_blank');
+  };
+
+
   // Cart Calculations snapshots
   const rawSubtotal = cartItems.reduce((acc, item) => {
     const prod = products.find((p) => p.id === item.productId);
@@ -1428,9 +1460,22 @@ export default function App() {
   const cartSgst = gstEnabled ? cartNetPrice * (sgstRate / 100) : 0;
   const cartGrandTotal = cartNetPrice + cartCgst + cartSgst + cartDeliverySum + packagingFee + cartSafetySum;
 
-  // Filter products for customer: only display active ones matching active size, maxPrice, and minRating filters
+  // Filter products for customer: only display active ones matching active search, category, size, maxPrice, and minRating filters
   const activeProducts = products.filter(p => {
     if (p.isActive === false) return false;
+
+    // Search query check
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchName = p.name.toLowerCase().includes(query);
+      const matchDesc = p.description?.toLowerCase().includes(query) || false;
+      if (!matchName && !matchDesc) return false;
+    }
+
+    // Category filter check
+    if (selectedCategoryFilter) {
+      if (p.category !== selectedCategoryFilter) return false;
+    }
 
     // Size filter check
     if (filterSize) {
@@ -1865,10 +1910,55 @@ export default function App() {
               )}
             </div>
 
+            {/* Search Input Bar */}
+            <div className="bg-white border border-rose-100 p-4 rounded-2xl shadow-sm mb-4">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search products by name or description..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-rose-50/20 border border-rose-100 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-705 focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-slate-400 text-slate-800"
+                />
+              </div>
+            </div>
+
+            {/* Horizontal Category Quick Filters */}
+            {categoriesList.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none scroll-smooth">
+                <button
+                  onClick={() => setSelectedCategoryFilter('')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border cursor-pointer ${
+                    !selectedCategoryFilter
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-rose-100 hover:bg-rose-50'
+                  }`}
+                >
+                  All Items
+                </button>
+                {categoriesList.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategoryFilter(cat.name)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border cursor-pointer ${
+                      selectedCategoryFilter === cat.name
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                        : 'bg-white text-slate-600 border-rose-100 hover:bg-rose-50'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Catalog Filters Bar */}
             <div className="bg-white border border-rose-100 p-4 rounded-2xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="flex items-center gap-2 text-rose-700 font-bold text-sm shrink-0">
-                <span>🔍 Filter Collection:</span>
+                <span>⚙️ Filter Options:</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto flex-1 md:max-w-3xl">
                 {/* Size Filter selector */}
@@ -1920,12 +2010,14 @@ export default function App() {
               </div>
 
               {/* Reset filter action button */}
-              {(filterSize || filterMaxPrice || filterMinRating) && (
+              {(filterSize || filterMaxPrice || filterMinRating || searchQuery || selectedCategoryFilter) && (
                 <button
                   onClick={() => {
                     setFilterSize('');
                     setFilterMaxPrice('');
                     setFilterMinRating('');
+                    setSearchQuery('');
+                    setSelectedCategoryFilter('');
                   }}
                   className="w-full md:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
                 >
@@ -2339,6 +2431,15 @@ export default function App() {
                             ✓ View / Print Receipt
                           </button>
                         )}
+                        {/* WhatsApp Notification: only for payment_pending orders */}
+                        {(order.status === 'payment_pending') && (
+                          <button
+                            onClick={() => handleSendWhatsAppOrder(order)}
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-emerald-200 transition-colors flex items-center gap-1"
+                          >
+                            💬 Send Details via WhatsApp
+                          </button>
+                        )}
                         {/* Cancel button: only for approved/synced orders not yet cancelled/rejected */}
                         {(order.status === 'approved' || order.status === 'synced' || order.status === 'pending_sync') && (
                           <button
@@ -2598,6 +2699,15 @@ export default function App() {
                 {/* Admin Tab Selector */}
                 <div className="flex flex-wrap gap-2 border-b border-rose-100 pb-3">
                   <button
+                    onClick={() => setAdminActiveTab('dashboard')}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'dashboard'
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                      }`}
+                  >
+                    📊 Business Dashboard
+                  </button>
+                  <button
                     onClick={() => setAdminActiveTab('inventory')}
                     className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'inventory'
                       ? 'bg-rose-600 text-white shadow-md'
@@ -2660,6 +2770,127 @@ export default function App() {
 
                 {/* Tab content area */}
                 <div className="animate-in fade-in duration-200">
+
+                  {/* BUSINESS DASHBOARD TAB */}
+                  {adminActiveTab === 'dashboard' && (() => {
+                    const approvedOrders = allOrders.filter(o => o.status === 'approved');
+                    const totalRevenue = approvedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+                    const pendingCount = allOrders.filter(o => o.status === 'payment_pending').length;
+                    const lowStockProds = products.filter(p => p.isActive !== false && p.stock < 5);
+                    
+                    // Aggregate top sellers
+                    const salesMap: Record<string, number> = {};
+                    approvedOrders.forEach(o => {
+                      const itemsList = Array.isArray(o.items) ? o.items : [];
+                      itemsList.forEach(item => {
+                        const matchingProd = products.find(p => p.id === item.productId);
+                        const prodName = matchingProd ? matchingProd.name : 'Unknown Product';
+                        salesMap[prodName] = (salesMap[prodName] || 0) + item.quantity;
+                      });
+                    });
+                    const topSellers = Object.entries(salesMap)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5);
+
+                    return (
+                      <div className="space-y-6">
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                            <div className="absolute right-2 bottom-2 text-7xl opacity-15">₹</div>
+                            <div className="text-xs font-bold uppercase tracking-wider opacity-90">Total Revenue</div>
+                            <div className="text-2xl font-black mt-2">₹{totalRevenue.toFixed(2)}</div>
+                            <div className="text-[10px] opacity-75 mt-1">From {approvedOrders.length} delivered orders</div>
+                          </div>
+                          
+                          <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Orders</div>
+                              <div className="text-2xl font-black text-slate-800 mt-2">{allOrders.length}</div>
+                            </div>
+                            <div className="text-[10px] text-slate-505 mt-2 flex justify-between">
+                              <span>Delivered: {approvedOrders.length}</span>
+                              <span>Rejected: {allOrders.filter(o => o.status === 'rejected').length}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Awaiting Approval</div>
+                              <div className="text-2xl font-black text-amber-600 mt-2">{pendingCount}</div>
+                            </div>
+                            <div className="text-[10px] text-slate-505 mt-2">
+                              {pendingCount > 0 ? '⚠️ Action needed to approve bills' : '✓ All orders processed'}
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Low Stock Alert</div>
+                              <div className={`text-2xl font-black mt-2 ${lowStockProds.length > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                {lowStockProds.length}
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-slate-505 mt-2">
+                              {lowStockProds.length > 0 ? '⚠️ Items need restock' : '✓ Stock levels normal'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Analysis Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Low Stock List */}
+                          <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                            <h4 className="font-bold text-slate-800 border-b border-rose-50 pb-2">Low Stock Catalog Items</h4>
+                            {lowStockProds.length === 0 ? (
+                              <p className="text-slate-400 text-xs italic">All product stock levels are healthy.</p>
+                            ) : (
+                              <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                                {lowStockProds.map(p => (
+                                  <div key={p.id} className="flex justify-between items-center bg-rose-50/20 border border-rose-100/60 p-2.5 rounded-xl text-xs">
+                                    <div className="flex items-center gap-2">
+                                      {p.imageUrl && <img src={p.imageUrl} alt={p.name} className="w-8 h-8 rounded-lg object-cover" />}
+                                      <div>
+                                        <div className="font-bold text-slate-850">{p.name}</div>
+                                        <div className="text-[10px] text-slate-400">Category: {p.category}</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="font-black text-rose-650 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full">
+                                        Stock: {p.stock}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Top Sellers */}
+                          <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
+                            <h4 className="font-bold text-slate-800 border-b border-rose-50 pb-2">Top Selling Garments</h4>
+                            {topSellers.length === 0 ? (
+                              <p className="text-slate-400 text-xs italic">No sales recorded yet.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {topSellers.map(([name, qty], idx) => (
+                                  <div key={name} className="flex justify-between items-center bg-rose-50/10 border border-rose-100/40 p-2.5 rounded-xl text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-[10px]">{idx + 1}</span>
+                                      <span className="font-bold text-slate-700">{name}</span>
+                                    </div>
+                                    <span className="font-black text-slate-850 bg-slate-100 px-2 py-0.5 rounded-full">
+                                      {qty} sold
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* INVENTORY TAB */}
                   {adminActiveTab === 'inventory' && (
@@ -4055,6 +4286,13 @@ export default function App() {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-5 text-xs text-blue-700 font-medium text-left">
               📋 Keep your Order Ref number safe. Once admin approves your payment, you can view and print your receipt from <strong>My Orders</strong>.
             </div>
+
+            <button
+              onClick={() => handleSendWhatsAppOrder(pendingApprovalOrder)}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition-colors shadow-md text-sm mb-2.5 flex items-center justify-center gap-1.5"
+            >
+              💬 Send Details via WhatsApp
+            </button>
 
             <button
               onClick={() => {
