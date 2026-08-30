@@ -146,3 +146,122 @@
   }
 }
 
+/* ============================================================
+   RESPONSIVE UTILITIES — Mobile-first
+   ============================================================ */
+
+/* Touch-friendly minimum tap target sizes (WCAG AA) */
+button, a, [role="button"] {
+  min-height: 36px;
+}
+
+@media (max-width: 640px) {
+  button, a, [role="button"] {
+    min-height: 40px;
+  }
+}
+
+/* Smooth horizontal scrolling for nav bars on mobile */
+.no-scrollbar-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  white-space: nowrap;
+  scroll-snap-type: x mandatory;
+}
+.no-scrollbar-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch-optimized smooth scroll */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Prevent horizontal overflow on the whole page */
+body, #root {
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Safe area insets for notched phones (iPhone X+) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Responsive card stack utility */
+@media (max-width: 479px) {
+  .mobile-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .mobile-full {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .mobile-text-sm {
+    font-size: 0.75rem !important;
+  }
+  .mobile-hide {
+    display: none !important;
+  }
+}
+
+/* Responsive grid helpers */
+@media (max-width: 639px) {
+  .responsive-2col {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (min-width: 640px) and (max-width: 767px) {
+  .responsive-2col {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (min-width: 768px) {
+  .responsive-2col {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@media (min-width: 1024px) {
+  .responsive-2col {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Image responsive defaults */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Modal/dialog mobile fullscreen safety */
+@media (max-width: 640px) {
+  .modal-mobile {
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 1rem 1rem 0 0;
+    margin-bottom: 0;
+  }
+}
+
+/* Admin panel horizontal scroll on small screens */
+.admin-tabs-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.admin-tabs-scroll::-webkit-scrollbar { display: none; }
+
+/* Responsive table overflow */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}

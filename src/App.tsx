@@ -2313,15 +2313,15 @@ export default function App() {
   const cities = shipCountry && shipState ? LOCATION_DATA[shipCountry][shipState] || [] : [];
 
   return (
-    <div className={`min-h-screen font-sans flex flex-col relative print:bg-white print:text-black ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-rose-50/50 text-slate-800'}`}>
+    <div className={`min-h-screen font-sans flex flex-col relative print:bg-white print:text-black overflow-x-hidden ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-rose-50/50 text-slate-800'}`}>
 
       {/* Toast Alert Notification */}
       {toast && (
-        <div className="fixed top-5 right-5 z-55 max-w-sm w-full bg-white border border-rose-100 rounded-xl shadow-2xl p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden">
-          <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
+        <div className="fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[9998] max-w-sm w-auto sm:w-full bg-white border border-rose-100 rounded-xl shadow-2xl p-3 sm:p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden">
+          <span className={`w-3 h-3 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
             }`} />
-          <div className="text-sm font-medium text-slate-700">{toast.message}</div>
-          <button onClick={() => setToast(null)} className="ml-auto text-slate-400 hover:text-slate-600 font-bold">✕</button>
+          <div className="text-xs sm:text-sm font-medium text-slate-700 flex-1">{toast.message}</div>
+          <button onClick={() => setToast(null)} className="ml-auto text-slate-400 hover:text-slate-600 font-bold shrink-0">✕</button>
         </div>
       )}
 
@@ -2336,23 +2336,28 @@ export default function App() {
       )}
 
       {/* Top Banner & Header */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-rose-100 px-4 py-3 flex items-center justify-between shadow-sm print:hidden">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentPage('home')}>
-          <img src="/logo.jpg" alt="KRP Creation Logo" className="w-16 h-16 object-contain rounded-full border border-rose-100 shadow-sm shrink-0" />
-          <div className="flex flex-col">
-            <span className="text-2xl font-extrabold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent leading-none">
+      <header className={`sticky top-0 z-50 backdrop-blur-md border-b px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between shadow-sm print:hidden ${isDark ? 'bg-slate-900/95 border-slate-700' : 'bg-white/95 border-rose-100'}`}>
+        {/* Logo + Brand */}
+        <div className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onClick={() => setCurrentPage('home')}>
+          <img src="/logo.jpg" alt="KRP Creation Logo" className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain rounded-full border border-rose-100 shadow-sm shrink-0" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-base sm:text-xl md:text-2xl font-extrabold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent leading-none truncate">
               KRP Creation
             </span>
-            <span className="text-xs tracking-wider text-rose-500 font-semibold mt-0.5">{t('tagline')}</span>
+            <span className="hidden sm:block text-[10px] sm:text-xs tracking-wider text-rose-500 font-semibold mt-0.5">{t('tagline')}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Online / Offline pill */}
-          <div className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border shadow-sm ${isDark ? 'border-slate-600 bg-slate-800' : 'border-rose-100 bg-white'}`}>
-            <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className={isOnline ? 'text-emerald-500' : 'text-rose-500'}>
+        {/* Right Controls */}
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          {/* Online / Offline pill — dot only on mobile */}
+          <div className={`flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2.5 py-1 rounded-full border shadow-sm ${isDark ? 'border-slate-600 bg-slate-800' : 'border-rose-100 bg-white'}`}>
+            <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span className={`hidden xs:inline ${isOnline ? 'text-emerald-500' : 'text-rose-500'}`}>
               {isOnline ? t('online') : t('offline')}
+            </span>
+            <span className={`xs:hidden text-[9px] font-bold ${isOnline ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {isOnline ? '●' : '○'}
             </span>
           </div>
 
@@ -2360,19 +2365,19 @@ export default function App() {
           <button
             onClick={() => setIsDark(prev => !prev)}
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className={`w-8 h-8 flex items-center justify-center rounded-full border text-sm transition-all shadow-sm cursor-pointer ${isDark ? 'bg-slate-700 border-slate-600 text-yellow-300 hover:bg-slate-600' : 'bg-white border-rose-100 text-slate-600 hover:bg-rose-50'}`}
+            className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full border text-xs sm:text-sm transition-all shadow-sm cursor-pointer shrink-0 ${isDark ? 'bg-slate-700 border-slate-600 text-yellow-300 hover:bg-slate-600' : 'bg-white border-rose-100 text-slate-600 hover:bg-rose-50'}`}
           >
             {isDark ? '☀️' : '🌙'}
           </button>
 
           {/* Language Selector */}
-          <div className={`flex items-center rounded-full border overflow-hidden shadow-sm text-[10px] font-bold ${isDark ? 'border-slate-600 bg-slate-800' : 'border-rose-100 bg-white'}`}>
+          <div className={`flex items-center rounded-full border overflow-hidden shadow-sm text-[9px] sm:text-[10px] font-bold ${isDark ? 'border-slate-600 bg-slate-800' : 'border-rose-100 bg-white'}`}>
             {(['en', 'bn', 'hi'] as Lang[]).map((l) => (
               <button
                 key={l}
                 onClick={() => setLang(l)}
                 title={l === 'en' ? 'English' : l === 'bn' ? 'বাংলা' : 'हिन्दी'}
-                className={`px-2 py-1 transition-all cursor-pointer ${
+                className={`px-1.5 sm:px-2 py-1 transition-all cursor-pointer ${
                   lang === l
                     ? 'bg-rose-600 text-white'
                     : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-rose-50'
@@ -2386,20 +2391,18 @@ export default function App() {
           {user ? (
             <button
               onClick={() => setIsProfileOpen(true)}
-              className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-3 py-1 rounded-full border border-rose-100 transition-colors cursor-pointer shadow-sm"
+              className="flex items-center gap-1 sm:gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 rounded-full border border-rose-100 transition-colors cursor-pointer shadow-sm max-w-[100px] sm:max-w-none"
             >
-              👤 {user.name}
-              <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-bold ${isAdmin(user.phone)
-                ? 'bg-rose-100 text-rose-700'
-                : 'bg-indigo-50 text-indigo-700'
-                }`}>
+              <span>👤</span>
+              <span className="truncate">{user.name.split(' ')[0]}</span>
+              <span className={`hidden sm:inline text-[9px] uppercase px-1.5 rounded font-bold ${isAdmin(user.phone) ? 'bg-rose-100 text-rose-700' : 'bg-indigo-50 text-indigo-700'}`}>
                 {isAdmin(user.phone) ? 'Admin' : 'User'}
               </span>
             </button>
           ) : (
             <button
               onClick={() => setCurrentPage('login')}
-              className="text-xs text-rose-650 hover:text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-100 transition-all cursor-pointer shadow-sm"
+              className="text-[10px] sm:text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 px-2 sm:px-3 py-1 rounded-full border border-rose-100 transition-all cursor-pointer shadow-sm whitespace-nowrap"
             >
               {t('signIn')}
             </button>
@@ -2408,30 +2411,27 @@ export default function App() {
       </header>
 
       {/* Navigation Tabs */}
-      <nav className={`border-b flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm shadow-sm print:hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
-        <div className="flex flex-wrap items-center gap-2">
+      <nav className={`border-b shadow-sm print:hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
+        <div className="admin-tabs-scroll flex items-center gap-1 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm">
           <button
             onClick={() => setCurrentPage('home')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'home' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
-              }`}
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${currentPage === 'home' ? 'bg-rose-600 text-white shadow-md' : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-rose-50'}`}
           >
             {t('home')}
           </button>
           <button
             onClick={() => setCurrentPage('catalog')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'catalog' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
-              }`}
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${currentPage === 'catalog' ? 'bg-rose-600 text-white shadow-md' : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-rose-50'}`}
           >
             {t('catalog')}
           </button>
           <button
             onClick={() => setCurrentPage('cart')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${currentPage === 'cart' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
-              }`}
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1 sm:gap-1.5 shrink-0 ${currentPage === 'cart' ? 'bg-rose-600 text-white shadow-md' : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-rose-50'}`}
           >
             {t('cart')}
             {cartItems.length > 0 && (
-              <span className="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-rose-100 text-rose-700 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-bold">
                 {cartItems.reduce((acc, i) => acc + i.quantity, 0)}
               </span>
             )}
@@ -2441,8 +2441,7 @@ export default function App() {
           {user && (
             <button
               onClick={() => setCurrentPage('my-orders')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'my-orders' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-550 hover:text-slate-700 hover:bg-rose-55'
-                }`}
+              className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${currentPage === 'my-orders' ? 'bg-rose-600 text-white shadow-md' : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-rose-50'}`}
             >
               {t('myOrders')}
             </button>
@@ -2451,8 +2450,7 @@ export default function App() {
           {/* Contact Us tab */}
           <button
             onClick={() => setCurrentPage('contact')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'contact' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-550 hover:text-slate-700 hover:bg-rose-55'
-              }`}
+            className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${currentPage === 'contact' ? 'bg-rose-600 text-white shadow-md' : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-rose-50'}`}
           >
             {t('contactUs')}
           </button>
@@ -2461,27 +2459,25 @@ export default function App() {
           {isAdmin(user?.phone) && (
             <button
               onClick={() => setCurrentPage('admin')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
-                }`}
+              className={`whitespace-nowrap px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1 sm:gap-1.5 shrink-0 ${currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-rose-50'}`}
             >
               <span>{t('adminPanel')}</span>
               {unreadOrdersCount > 0 && (
-                <span className="bg-rose-105 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+                <span className="bg-rose-500 text-white text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
                   {unreadOrdersCount}
                 </span>
               )}
             </button>
           )}
         </div>
-
       </nav>
 
       {/* Main Content Areas */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-2 md:p-2 print:hidden">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2 py-2 sm:px-3 sm:py-3 md:px-4 md:py-4 lg:px-6 print:hidden">
 
         {/* Home Landing Page */}
         {currentPage === 'home' && (
-          <div className="space-y-1 animate-in fade-in duration-300">
+          <div className="space-y-3 sm:space-y-4 animate-in fade-in duration-300">
 
 
             {/* Announcements Ticker */}
@@ -2548,12 +2544,12 @@ export default function App() {
             )}
 
             {/* Hero Section */}
-            <div className="relative bg-white rounded-3xl overflow-hidden border border-rose-100 shadow-sm p-6 sm:p-12 flex flex-col md:flex-row items-center gap-8">
+            <div className="relative bg-white rounded-2xl sm:rounded-3xl overflow-hidden border border-rose-100 shadow-sm p-4 sm:p-8 md:p-12 flex flex-col md:flex-row items-center gap-6 md:gap-8">
               <div className="flex-1 space-y-6 text-center md:text-left">
                 <span className="text-xs uppercase tracking-widest bg-rose-100 text-rose-700 px-3.5 py-1 rounded-full border border-rose-200 font-bold">
                   Est. 2026 Boutique
                 </span>
-                <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 font-serif leading-tight">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 font-serif leading-tight">
                   Discover Handcrafted <br />
                   <span className="bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent">
                     Ladies Garments
@@ -2586,7 +2582,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div className="w-64 h-64 sm:w-80 sm:h-80 shrink-0 relative overflow-hidden rounded-full border border-rose-200 shadow-md">
+              <div className="w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 shrink-0 relative overflow-hidden rounded-full border border-rose-200 shadow-md">
                 <img
                   src="/model_kurti.png"
                   alt="Model wearing premium KRP Kurti"
@@ -2596,27 +2592,27 @@ export default function App() {
             </div>
 
             {/* Quality & Features Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white border border-rose-100 p-6 rounded-2xl shadow-sm text-center space-y-3">
-                <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">✨</div>
-                <h3 className="font-bold text-base text-slate-800 font-serif">Premium Quality Fabrics</h3>
-                <p className="text-xs text-slate-505 leading-relaxed">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+              <div className={`border p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm text-center space-y-2 sm:space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto text-lg sm:text-xl font-bold">✨</div>
+                <h3 className="font-bold text-sm sm:text-base text-slate-800 font-serif">Premium Quality Fabrics</h3>
+                <p className="text-xs text-slate-500 leading-relaxed hidden sm:block">
                   Every product is sourced using the finest silk, cotton, and georgette threads. Designed to feel lightweight on daily wear yet rich and heavy for ceremonies.
                 </p>
               </div>
 
-              <div className="bg-white border border-rose-100 p-6 rounded-2xl shadow-sm text-center space-y-3">
-                <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎉</div>
-                <h3 className="font-bold text-base text-slate-800 font-serif">Festive & Daily Versatility</h3>
-                <p className="text-xs text-slate-505 leading-relaxed">
+              <div className={`border p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm text-center space-y-2 sm:space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto text-lg sm:text-xl font-bold">🎉</div>
+                <h3 className="font-bold text-sm sm:text-base text-slate-800 font-serif">Festive & Daily Versatility</h3>
+                <p className="text-xs text-slate-500 leading-relaxed hidden sm:block">
                   From intricate golden zari borders on sarees for Durga Puja/Diwali to comfortable, breathable cotton kurtis for work or home chores.
                 </p>
               </div>
 
-              <div className="bg-white border border-rose-100 p-6 rounded-2xl shadow-sm text-center space-y-3">
-                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
-                <h3 className="font-bold text-base text-slate-800 font-serif">Secure Local Shopping</h3>
-                <p className="text-xs text-slate-505 leading-relaxed">
+              <div className={`border p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-sm text-center space-y-2 sm:space-y-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-lg sm:text-xl font-bold">🔒</div>
+                <h3 className="font-bold text-sm sm:text-base text-slate-800 font-serif">Secure Local Shopping</h3>
+                <p className="text-xs text-slate-500 leading-relaxed hidden sm:block">
                   Our offline first setup stores all your credentials and shopping logs in secure sandbox memory, allowing complete access even in areas with zero network.
                 </p>
               </div>
@@ -2744,7 +2740,7 @@ export default function App() {
             </div>
 
             {/* Search Input Bar */}
-            <div className="bg-white border border-rose-100 p-4 rounded-2xl shadow-sm mb-4">
+            <div className={`border p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-sm mb-3 sm:mb-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                   🔍
@@ -2858,7 +2854,7 @@ export default function App() {
             </div>
 
             {isCatalogSyncing && activeProducts.length === 0 ? (
-              <div className="grid grid-cols-3 gap-3 md:gap-6 px-1 md:px-0">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
                 {[1, 2, 3].map((n) => (
                   <div key={n} className="bg-white border border-rose-100/60 rounded-xl p-3 space-y-3 animate-pulse">
                     <div className="bg-rose-50/60 h-32 md:h-64 w-full rounded-lg" />
@@ -2874,7 +2870,7 @@ export default function App() {
                 <p className="text-slate-550">Currently no products match your active filters.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-3 md:gap-6 px-1 md:px-0">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
                 {activeProducts.map((product) => {
                   const onSale = product.discount && product.discount > 0;
                   const discountedPrice = getProductPrice(product);
@@ -3081,8 +3077,8 @@ export default function App() {
 
         {/* Cart Page */}
         {currentPage === 'cart' && (
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 mb-6 font-serif">Shopping Cart</h1>
+          <div className="animate-in fade-in duration-300">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800 mb-4 sm:mb-6 font-serif">Shopping Cart</h1>
             {cartItems.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-2xl border border-rose-100 shadow-sm">
                 <p className="text-slate-550">Your offline cart is empty.</p>
@@ -3104,12 +3100,12 @@ export default function App() {
                     return (
                       <div
                         key={item.id}
-                        className="flex items-center gap-4 bg-white border border-rose-100 p-4 rounded-2xl shadow-sm"
+                        className={`flex items-start sm:items-center gap-3 sm:gap-4 border p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}
                       >
                         {(() => {
                           const imgSrc = item.selectedVariant?.imageUrl || prod.imageUrl;
                           return imgSrc ? (
-                            <img src={imgSrc} alt={prod.name} className="w-20 h-20 object-cover rounded-lg bg-rose-50" />
+                            <img src={imgSrc} alt={prod.name} className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg bg-rose-50 shrink-0" />
                           ) : (
                             <div className="w-20 h-20 flex flex-col items-center justify-center bg-rose-100 border border-rose-200 text-rose-500 rounded-lg font-bold text-[9px] text-center px-1">
                               <span>👗 No Image</span>
@@ -3159,7 +3155,7 @@ export default function App() {
                 </div>
 
                 {/* Cart pricing summary including new taxes/charges */}
-                <div className="bg-white border border-rose-100 rounded-2xl p-5 h-fit space-y-4 shadow-sm text-sm">
+                <div className={`border rounded-xl sm:rounded-2xl p-4 sm:p-5 h-fit space-y-3 sm:space-y-4 shadow-sm text-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
                   <h3 className="font-bold text-base border-b border-rose-50 pb-3 text-slate-850">Price Breakdowns</h3>
 
                   <div className="flex justify-between text-slate-655">
@@ -3225,8 +3221,8 @@ export default function App() {
 
         {/* Customer Past Orders Tab */}
         {currentPage === 'my-orders' && (
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 mb-6 font-serif">My Order History</h1>
+          <div className="animate-in fade-in duration-300">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800 mb-4 sm:mb-6 font-serif">My Order History</h1>
 
             {customerOrders.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-rose-100 shadow-sm">
@@ -3243,7 +3239,7 @@ export default function App() {
                 {customerOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="bg-white border border-rose-100 p-6 rounded-2xl flex flex-col gap-4 text-sm shadow-sm"
+                    className={`border p-4 sm:p-6 rounded-xl sm:rounded-2xl flex flex-col gap-3 sm:gap-4 text-sm shadow-sm ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-rose-50 pb-3 gap-2">
                       <div>
@@ -3384,11 +3380,11 @@ export default function App() {
 
         {/* Contact Us Page */}
         {currentPage === 'contact' && (
-          <div className="max-w-md mx-auto bg-white border border-rose-100 rounded-2xl p-6 shadow-md animate-in fade-in duration-300">
-            <h2 className="text-2xl font-bold text-center text-slate-800 mb-1 font-serif">Contact Us</h2>
-            <p className="text-center text-slate-500 text-xs mb-6">Have any query? Send it to our admin support team directly via WhatsApp.</p>
+          <div className={`max-w-md mx-auto border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-md animate-in fade-in duration-300 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
+            <h2 className="text-xl sm:text-2xl font-bold text-center text-slate-800 mb-1 font-serif">Contact Us</h2>
+            <p className="text-center text-slate-500 text-xs mb-4 sm:mb-6">Have any query? Send it to our admin support team directly via WhatsApp.</p>
 
-            <form onSubmit={handleSendContactQuery} className="space-y-4 text-xs text-left">
+            <form onSubmit={handleSendContactQuery} className="space-y-3 sm:space-y-4 text-xs text-left">
               <div>
                 <label className="block text-[10px] font-semibold text-slate-600 mb-1">
                   Your Name <span className="text-rose-600 font-bold ml-0.5">*</span>
@@ -3436,8 +3432,8 @@ export default function App() {
                 <label className="block text-[10px] font-semibold text-slate-600 mb-1">
                   Select Support Team <span className="text-rose-600 font-bold ml-0.5">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7890784816' ? 'bg-rose-50 border-rose-300 font-bold' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7890784816' ? 'bg-rose-50 border-rose-300 font-bold' : isDark ? 'bg-slate-700 border-slate-600 hover:bg-slate-600' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
                     <input
                       type="radio"
                       name="admin_target"
@@ -3451,7 +3447,7 @@ export default function App() {
                     </div>
                   </label>
 
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7059782504' ? 'bg-rose-50 border-rose-300 font-bold' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7059782504' ? 'bg-rose-50 border-rose-300 font-bold' : isDark ? 'bg-slate-700 border-slate-600 hover:bg-slate-600' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
                     <input
                       type="radio"
                       name="admin_target"
@@ -3493,7 +3489,7 @@ export default function App() {
 
         {/* Login Page */}
         {currentPage === 'login' && (
-          <div className="max-w-md mx-auto bg-white border border-rose-100 rounded-2xl p-6 shadow-md">
+          <div className={`max-w-md mx-auto border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-md animate-in fade-in duration-300 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
             <div className="flex justify-center mb-4">
               <img src="/logo.jpg" alt="KRP Creation Logo" className="w-32 h-32 object-contain rounded-full border border-rose-100 shadow-sm" />
             </div>
@@ -3546,7 +3542,7 @@ export default function App() {
 
         {/* Register Page */}
         {currentPage === 'register' && (
-          <div className="max-w-md mx-auto bg-white border border-rose-100 rounded-2xl p-6 shadow-md">
+          <div className={`max-w-md mx-auto border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-md animate-in fade-in duration-300 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
             <div className="flex justify-center mb-4">
               <img src="/logo.jpg" alt="KRP Creation Logo" className="w-32 h-32 object-contain rounded-full border border-rose-100 shadow-sm" />
             </div>
@@ -3611,10 +3607,10 @@ export default function App() {
         {/* Admin Panel Page */}
         {currentPage === 'admin' && (
           <div>
-            <div className="flex items-center justify-between border-b border-rose-100 pb-4 mb-6">
+            <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 sm:pb-4 mb-4 sm:mb-6 ${isDark ? 'border-slate-700' : 'border-rose-100'}`}>
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 font-serif">Admin Dashboard</h1>
-                <p className="text-slate-505 text-sm mt-1">Requires stable internet connection to write modifications.</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800 font-serif">Admin Dashboard</h1>
+                <p className="text-slate-500 text-xs sm:text-sm mt-0.5 sm:mt-1">Requires stable internet connection to write modifications.</p>
               </div>
               <div className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-100 bg-white">
                 <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-555'}`} />
@@ -3637,94 +3633,32 @@ export default function App() {
             ) : (
               <div className="space-y-6">
 
-                {/* Admin Tab Selector */}
-                <div className="flex flex-wrap gap-2 border-b border-rose-100 pb-3">
-                  <button
-                    onClick={() => setAdminActiveTab('dashboard')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'dashboard'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                {/* Admin Tab Selector — horizontally scrollable on mobile */}
+                <div className="admin-tabs-scroll flex gap-1.5 border-b pb-3 mb-1" style={{ borderColor: isDark ? '#334155' : '#ffe4e6' }}>
+                  {[
+                    { key: 'dashboard', label: '📊 Dashboard' },
+                    { key: 'inventory', label: '🛍️ Inventory' },
+                    { key: 'orders', label: '📦 Orders', badge: unreadOrdersCount },
+                    { key: 'announcements', label: '📢 Announcements' },
+                    { key: 'events', label: '📅 Events' },
+                    { key: 'categories', label: '🏷️ Categories' },
+                    { key: 'festivals', label: '🎉 Festivals' },
+                    { key: 'event_types', label: '📋 Event Types' },
+                    { key: 'settings', label: '⚙️ Settings' },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setAdminActiveTab(tab.key as typeof adminActiveTab)}
+                      className={`whitespace-nowrap px-3 py-2 text-xs font-bold rounded-xl transition-all shrink-0 flex items-center gap-1.5 ${
+                        adminActiveTab === tab.key
+                          ? 'bg-rose-600 text-white shadow-md'
+                          : isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600' : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
                       }`}
-                  >
-                    📊 Business Dashboard
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('inventory')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'inventory'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    🛍️ Catalog & Inventory
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('orders')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${adminActiveTab === 'orders'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    📦 Orders Log
-                    {unreadOrdersCount > 0 && (
-                      <span className="bg-rose-100 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                        {unreadOrdersCount}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('announcements')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'announcements'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    📢 Announcements & Live
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('events')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'events'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    📅 Scheduled Events
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('categories')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'categories'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    🏷️ Product Categories
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('festivals')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'festivals'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    🎉 Festivals
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('event_types')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'event_types'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    📋 Event Types
-                  </button>
-                  <button
-                    onClick={() => setAdminActiveTab('settings')}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${adminActiveTab === 'settings'
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
-                  >
-                    ⚙️ Taxes & Settings
-                  </button>
+                    >
+                      {tab.label}
+                      {tab.badge ? <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">{tab.badge}</span> : null}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Tab content area */}
@@ -3754,7 +3688,7 @@ export default function App() {
                     return (
                       <div className="space-y-6">
                         {/* KPI Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                           <div className="bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-2xl p-4 shadow-sm relative overflow-hidden">
                             <div className="absolute right-2 bottom-2 text-7xl opacity-15">₹</div>
                             <div className="text-xs font-bold uppercase tracking-wider opacity-90">Total Revenue</div>
@@ -5181,7 +5115,8 @@ export default function App() {
       {/* Checkout Shipping Form Modal */}
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden animate-in fade-in duration-200">
-          <div className="bg-white border border-rose-100 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-805 p-4">
+          <div className={`border w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[92vh] ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-rose-100 text-slate-800'}`}>
+            <div className="overflow-y-auto p-4">
             <button
               onClick={() => setIsCheckoutOpen(false)}
               className="absolute top-2.5 right-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 w-6 h-6 rounded-full flex items-center justify-center font-bold transition-colors border border-rose-100 text-xs"
@@ -5218,7 +5153,7 @@ export default function App() {
               </div>
 
               {/* Grid: Country, State, City */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Country *</label>
                   <select
@@ -5300,6 +5235,7 @@ export default function App() {
                 Proceed to Payment
               </button>
             </form>
+            </div>{/* /scrollable wrapper */}
           </div>
         </div>
       )}
@@ -5647,7 +5583,7 @@ export default function App() {
       {/* User Profile Modal */}
       {isProfileOpen && user && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden">
-          <div className="bg-white border border-rose-100 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 text-slate-800 p-5 space-y-4">
+          <div className={`border w-full max-w-sm rounded-2xl overflow-y-auto shadow-2xl relative animate-in fade-in zoom-in duration-200 p-5 space-y-4 max-h-[90vh] ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-rose-100 text-slate-800'}`}>
             <button
               onClick={() => {
                 setIsProfileOpen(false);
