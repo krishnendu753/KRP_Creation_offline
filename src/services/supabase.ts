@@ -381,6 +381,8 @@ export const pullEventsFromCloud = async (): Promise<number> => {
       eventEndDate: item.event_end_date || undefined,
       description: item.description,
       linkUrl: item.link_url || undefined,
+      isCompleted: item.is_completed || false,
+      isExpired: item.is_expired || false,
       createdAt: new Date(item.created_at).getTime()
     }));
     await db.events.bulkPut(formatted);

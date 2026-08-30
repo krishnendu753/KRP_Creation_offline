@@ -42,6 +42,252 @@ const isAdmin = (phone: string | undefined) => {
   return ADMIN_PHONES.some(adminPhone => cleanPhone.endsWith(adminPhone));
 };
 
+// ============================================================
+// TRANSLATIONS — English | Bengali | Hindi
+// ============================================================
+type Lang = 'en' | 'bn' | 'hi';
+
+const TRANSLATIONS: Record<Lang, Record<string, string>> = {
+  en: {
+    // Header
+    tagline: 'Ladies Garments',
+    online: 'Online',
+    offline: 'Offline',
+    signIn: 'Sign In',
+    // Navigation
+    home: 'Home',
+    catalog: 'Catalog',
+    cart: 'Cart',
+    myOrders: 'My Orders',
+    contactUs: 'Contact Us',
+    adminPanel: 'Admin Panel',
+    // Home Page
+    welcomeTitle: 'Welcome to KRP Creation',
+    welcomeSubtitle: 'Discover the finest ladies garments at the best prices.',
+    eventsTitle: 'Events & Exhibitions',
+    viewAll: 'View All',
+    shopNow: 'Shop Now',
+    joinWhatsapp: 'Join WhatsApp Channel',
+    // Catalog
+    searchPlaceholder: 'Search products…',
+    filterBy: 'Filter by',
+    allCategories: 'All Categories',
+    addToCart: 'Add to Cart',
+    buyNow: 'Buy Now',
+    inStock: 'In Stock',
+    outOfStock: 'Out of Stock',
+    offLabel: 'off',
+    // Cart
+    yourCart: 'Your Cart',
+    cartEmpty: 'Your cart is empty.',
+    continueShopping: 'Continue Shopping',
+    subtotal: 'Subtotal',
+    discount: 'Discount',
+    delivery: 'Delivery',
+    packaging: 'Packaging',
+    safety: 'Safety Fee',
+    cgst: 'CGST',
+    sgst: 'SGST',
+    grandTotal: 'Grand Total',
+    proceedToCheckout: 'Proceed to Checkout',
+    // Orders
+    orderId: 'Order ID',
+    orderDate: 'Order Date',
+    status: 'Status',
+    noOrders: 'No orders found.',
+    // Contact
+    contactTitle: 'Contact Us',
+    contactSubtitle: 'We\'re here to help. Reach out via WhatsApp!',
+    yourName: 'Your Name',
+    yourPhone: 'Your Phone',
+    queryCategory: 'Query Category',
+    yourMessage: 'Your Message',
+    sendWhatsapp: 'Send on WhatsApp',
+    supportTeam: 'Choose Support Team',
+    // Events
+    lastDayToday: 'LAST DAY TODAY',
+    exploreNow: 'Explore Now',
+    // Auth
+    loginTitle: 'Sign In',
+    registerTitle: 'Create Account',
+    phoneNumber: 'Phone Number',
+    pinLabel: 'PIN',
+    yourFullName: 'Your Full Name',
+    loginBtn: 'Sign In',
+    registerBtn: 'Create Account',
+    noAccount: 'Don\'t have an account?',
+    hasAccount: 'Already have an account?',
+    // Common
+    close: 'Close',
+    cancel: 'Cancel',
+    save: 'Save Changes',
+    delete: 'Delete',
+    edit: 'Edit',
+    confirm: 'Confirm',
+    loading: 'Loading…',
+    processing: 'Processing...',
+  },
+  bn: {
+    // Header
+    tagline: 'মহিলা পোশাক',
+    online: 'অনলাইন',
+    offline: 'অফলাইন',
+    signIn: 'সাইন ইন',
+    // Navigation
+    home: 'হোম',
+    catalog: 'ক্যাটালগ',
+    cart: 'কার্ট',
+    myOrders: 'আমার অর্ডার',
+    contactUs: 'যোগাযোগ করুন',
+    adminPanel: 'অ্যাডমিন প্যানেল',
+    // Home Page
+    welcomeTitle: 'KRP Creation-এ স্বাগতম',
+    welcomeSubtitle: 'সেরা দামে সেরা মহিলা পোশাক আবিষ্কার করুন।',
+    eventsTitle: 'ইভেন্ট ও প্রদর্শনী',
+    viewAll: 'সব দেখুন',
+    shopNow: 'এখনই কিনুন',
+    joinWhatsapp: 'হোয়াটসঅ্যাপ চ্যানেলে যোগ দিন',
+    // Catalog
+    searchPlaceholder: 'পণ্য খুঁজুন…',
+    filterBy: 'ফিল্টার করুন',
+    allCategories: 'সব ক্যাটাগরি',
+    addToCart: 'কার্টে যোগ করুন',
+    buyNow: 'এখনই কিনুন',
+    inStock: 'স্টকে আছে',
+    outOfStock: 'স্টক নেই',
+    offLabel: 'ছাড়',
+    // Cart
+    yourCart: 'আপনার কার্ট',
+    cartEmpty: 'আপনার কার্ট খালি।',
+    continueShopping: 'কেনাকাটা চালিয়ে যান',
+    subtotal: 'সাবটোটাল',
+    discount: 'ছাড়',
+    delivery: 'ডেলিভারি',
+    packaging: 'প্যাকেজিং',
+    safety: 'নিরাপত্তা ফি',
+    cgst: 'সিজিএসটি',
+    sgst: 'এসজিএসটি',
+    grandTotal: 'মোট মূল্য',
+    proceedToCheckout: 'চেকআউটে যান',
+    // Orders
+    orderId: 'অর্ডার আইডি',
+    orderDate: 'অর্ডারের তারিখ',
+    status: 'স্ট্যাটাস',
+    noOrders: 'কোনো অর্ডার পাওয়া যায়নি।',
+    // Contact
+    contactTitle: 'যোগাযোগ করুন',
+    contactSubtitle: 'আমরা সাহায্য করতে প্রস্তুত। হোয়াটসঅ্যাপে যোগাযোগ করুন!',
+    yourName: 'আপনার নাম',
+    yourPhone: 'আপনার ফোন',
+    queryCategory: 'প্রশ্নের ধরন',
+    yourMessage: 'আপনার বার্তা',
+    sendWhatsapp: 'হোয়াটসঅ্যাপে পাঠান',
+    supportTeam: 'সাপোর্ট টিম বেছে নিন',
+    // Events
+    lastDayToday: 'আজ শেষ দিন',
+    exploreNow: 'এখনই দেখুন',
+    // Auth
+    loginTitle: 'সাইন ইন',
+    registerTitle: 'অ্যাকাউন্ট তৈরি করুন',
+    phoneNumber: 'ফোন নম্বর',
+    pinLabel: 'পিন',
+    yourFullName: 'আপনার পুরো নাম',
+    loginBtn: 'সাইন ইন',
+    registerBtn: 'অ্যাকাউন্ট তৈরি করুন',
+    noAccount: 'অ্যাকাউন্ট নেই?',
+    hasAccount: 'ইতিমধ্যে অ্যাকাউন্ট আছে?',
+    // Common
+    close: 'বন্ধ করুন',
+    cancel: 'বাতিল',
+    save: 'পরিবর্তন সংরক্ষণ করুন',
+    delete: 'মুছে ফেলুন',
+    edit: 'সম্পাদনা',
+    confirm: 'নিশ্চিত করুন',
+    loading: 'লোড হচ্ছে…',
+    processing: 'প্রক্রিয়া করা হচ্ছে...',
+  },
+  hi: {
+    // Header
+    tagline: 'महिला वस्त्र',
+    online: 'ऑनलाइन',
+    offline: 'ऑफलाइन',
+    signIn: 'साइन इन',
+    // Navigation
+    home: 'होम',
+    catalog: 'कैटलॉग',
+    cart: 'कार्ट',
+    myOrders: 'मेरे ऑर्डर',
+    contactUs: 'संपर्क करें',
+    adminPanel: 'एडमिन पैनल',
+    // Home Page
+    welcomeTitle: 'KRP Creation में आपका स्वागत है',
+    welcomeSubtitle: 'सर्वोत्तम कीमतों पर सुंदर महिला वस्त्र खोजें।',
+    eventsTitle: 'इवेंट और प्रदर्शनी',
+    viewAll: 'सब देखें',
+    shopNow: 'अभी खरीदें',
+    joinWhatsapp: 'व्हाट्सऐप चैनल से जुड़ें',
+    // Catalog
+    searchPlaceholder: 'उत्पाद खोजें…',
+    filterBy: 'फ़िल्टर करें',
+    allCategories: 'सभी श्रेणियाँ',
+    addToCart: 'कार्ट में जोड़ें',
+    buyNow: 'अभी खरीदें',
+    inStock: 'उपलब्ध है',
+    outOfStock: 'स्टॉक खत्म',
+    offLabel: 'छूट',
+    // Cart
+    yourCart: 'आपका कार्ट',
+    cartEmpty: 'आपका कार्ट खाली है।',
+    continueShopping: 'खरीदारी जारी रखें',
+    subtotal: 'उप-योग',
+    discount: 'छूट',
+    delivery: 'डिलीवरी',
+    packaging: 'पैकेजिंग',
+    safety: 'सुरक्षा शुल्क',
+    cgst: 'सीजीएसटी',
+    sgst: 'एसजीएसटी',
+    grandTotal: 'कुल राशि',
+    proceedToCheckout: 'चेकआउट करें',
+    // Orders
+    orderId: 'ऑर्डर आईडी',
+    orderDate: 'ऑर्डर की तारीख',
+    status: 'स्थिति',
+    noOrders: 'कोई ऑर्डर नहीं मिला।',
+    // Contact
+    contactTitle: 'संपर्क करें',
+    contactSubtitle: 'हम सहायता के लिए यहाँ हैं। व्हाट्सऐप पर संपर्क करें!',
+    yourName: 'आपका नाम',
+    yourPhone: 'आपका फोन',
+    queryCategory: 'प्रश्न की श्रेणी',
+    yourMessage: 'आपका संदेश',
+    sendWhatsapp: 'व्हाट्सऐप पर भेजें',
+    supportTeam: 'सपोर्ट टीम चुनें',
+    // Events
+    lastDayToday: 'आज आखिरी दिन',
+    exploreNow: 'अभी देखें',
+    // Auth
+    loginTitle: 'साइन इन',
+    registerTitle: 'खाता बनाएं',
+    phoneNumber: 'फोन नंबर',
+    pinLabel: 'पिन',
+    yourFullName: 'आपका पूरा नाम',
+    loginBtn: 'साइन इन',
+    registerBtn: 'खाता बनाएं',
+    noAccount: 'खाता नहीं है?',
+    hasAccount: 'पहले से खाता है?',
+    // Common
+    close: 'बंद करें',
+    cancel: 'रद्द करें',
+    save: 'बदलाव सहेजें',
+    delete: 'हटाएं',
+    edit: 'संपादन',
+    confirm: 'पुष्टि करें',
+    loading: 'लोड हो रहा है…',
+    processing: 'प्रक्रिया हो रही है...',
+  },
+};
+
+
 // Festival options and event types are now loaded dynamically from the database
 
 const LOCATION_DATA: Record<string, Record<string, string[]>> = {
@@ -60,7 +306,120 @@ const LOCATION_DATA: Record<string, Record<string, string[]>> = {
   }
 };
 
+// ============================================================
+// LastDayEventToast — 15-second auto-dismiss floating toast
+// ============================================================
+function LastDayEventToast({
+  ev,
+  lastDateStr,
+  totalCount,
+  activeIdx,
+  tLastDay,
+  tExplore,
+  onDismiss,
+  onNext,
+}: {
+  ev: import('./db/db').EventItem;
+  lastDateStr: string;
+  totalCount: number;
+  activeIdx: number;
+  tLastDay: string;
+  tExplore: string;
+  onDismiss: () => void;
+  onNext: () => void;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(15);
+
+  useEffect(() => {
+    setSecondsLeft(15);
+    const interval = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          onNext();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [ev.id]);
+
+  const typeLabel =
+    ev.type === 'live' ? '🎥 Live' :
+    ev.type === 'exhibition' ? '🎪 Exhibition' :
+    ev.type === 'product_launch' ? '🛍️ Launch' :
+    ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special';
+
+  const progressPct = ((15 - secondsLeft) / 15) * 100;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+      <div style={{ width: '100%', maxWidth: '440px', borderRadius: '1.25rem', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', background: 'linear-gradient(135deg, #be123c, #e11d48, #db2777)', color: 'white', border: '1px solid rgba(251,113,133,0.5)' }}>
+        {/* Progress bar */}
+        <div style={{ height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', width: '100%' }}>
+          <div style={{ height: '4px', backgroundColor: 'rgba(255,255,255,0.85)', width: `${progressPct}%`, transition: 'width 1s linear' }} />
+        </div>
+
+        <div style={{ padding: '1rem' }}>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+              <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', background: 'white', color: '#be123c', padding: '2px 8px', borderRadius: '4px' }}>
+                {tLastDay}
+              </span>
+              <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', background: 'rgba(0,0,0,0.25)', color: 'rgba(255,255,255,0.9)', padding: '2px 6px', borderRadius: '4px' }}>
+                {typeLabel}
+              </span>
+              {totalCount > 1 && (
+                <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.6)' }}>{activeIdx + 1}/{totalCount}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, background: 'rgba(0,0,0,0.3)', color: 'rgba(255,255,255,0.9)', padding: '2px 8px', borderRadius: '9999px', fontVariantNumeric: 'tabular-nums' }}>
+                {secondsLeft}s
+              </span>
+              <button
+                onClick={onDismiss}
+                style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.25)', color: 'white', width: '24px', height: '24px', borderRadius: '9999px', cursor: 'pointer', fontWeight: 700, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h4 style={{ fontWeight: 800, fontSize: '14px', color: 'white', margin: 0, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ev.title}
+              </h4>
+              <p style={{ fontSize: '11px', color: 'rgba(255,220,230,0.9)', margin: '4px 0 0', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {ev.description || `Final day: ${moment(lastDateStr).format('D MMM YYYY')}`}
+              </p>
+            </div>
+            {ev.linkUrl && (
+              <a
+                href={ev.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ flexShrink: 0, background: 'white', color: '#be123c', fontWeight: 700, fontSize: '11px', padding: '6px 12px', borderRadius: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+              >
+                {tExplore} ➜
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
+
   const { user, login: setAuthSession, logout } = useAuth();
   const { cartItems, addToCart, updateQuantity, clearCart } = useCart();
   const isOnline = useNetworkStatus();
@@ -171,7 +530,9 @@ export default function App() {
   const [eventEndDate, setEventEndDate] = useState('');
   const [eventDescription, setEventDescription] = useState('');
   const [eventLink, setEventLink] = useState('');
+  const [eventIsCompleted, setEventIsCompleted] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [dismissedLastDayEventIds, setDismissedLastDayEventIds] = useState<string[]>([]);
 
   // Admin Dashboard Active Tab State
   // tabs: 'dashboard' | 'inventory' | 'orders' | 'announcements' | 'events' | 'categories' | 'settings'
@@ -214,6 +575,24 @@ export default function App() {
 
   // Scroll to top state
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Theme: dark/light
+  const [isDark, setIsDark] = useState<boolean>(() =>
+    localStorage.getItem('app_theme') === 'dark'
+  );
+
+  // Language: en | bn | hi
+  const [lang, setLang] = useState<Lang>(() =>
+    (localStorage.getItem('app_lang') as Lang) || 'en'
+  );
+
+  // Translation helper
+  const t = (key: string): string => TRANSLATIONS[lang][key] ?? TRANSLATIONS['en'][key] ?? key;
+
+  // Last Day Events Toast State
+  const [lastDayToastIdx, setLastDayToastIdx] = useState(0);
+  const [lastDayToastVisible, setLastDayToastVisible] = useState(true);
+
 
   // Review states for customers
   const [reviewRating, setReviewRating] = useState(5);
@@ -282,7 +661,24 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Apply dark-mode class to <html> element and persist theme preference
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+    }
+    localStorage.setItem('app_theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
+
+  // Persist language preference
+  useEffect(() => {
+    localStorage.setItem('app_lang', lang);
+  }, [lang]);
+
+
   // Safeguard: Preselect first valid database category if selected one is removed or uninitialized
+
   useEffect(() => {
     if (categoriesList.length > 0 && !categoriesList.some(c => c.name === newProductCategory)) {
       setNewProductCategory(categoriesList[0].name);
@@ -298,6 +694,36 @@ export default function App() {
       setBigNoticeContent(announcementsList[0].bigNotice || '');
     }
   }, [announcementsList]);
+
+  // Automatically mark events & exhibitions as completed / expired if their date has passed
+  useEffect(() => {
+    if (!eventsList || eventsList.length === 0) return;
+    const todayStr = moment().format('YYYY-MM-DD');
+
+    const checkAndExpireEvents = async () => {
+      for (const ev of eventsList) {
+        const cutoffDate = ev.eventEndDate || ev.eventDate;
+        if (cutoffDate && cutoffDate < todayStr && !ev.isCompleted && !ev.isExpired) {
+          const updated: EventItem = {
+            ...ev,
+            isCompleted: true,
+            isExpired: true
+          };
+          await db.events.put(updated);
+          if (isOnline && isCloudConfigured()) {
+            try {
+              await syncEventToCloud(updated);
+            } catch (_) {
+              // Ignore cloud sync error while offline
+            }
+          }
+          console.log(`Event "${ev.title}" (Date: ${cutoffDate}) automatically marked as expired.`);
+        }
+      }
+    };
+
+    checkAndExpireEvents();
+  }, [eventsList, isOnline]);
 
   // Pull catalog products and global configurations from cloud on mount or online status change
   useEffect(() => {
@@ -599,6 +1025,8 @@ export default function App() {
                 eventEndDate: item.event_end_date || undefined,
                 description: item.description,
                 linkUrl: item.link_url || undefined,
+                isCompleted: item.is_completed || false,
+                isExpired: item.is_expired || false,
                 createdAt: new Date(item.created_at).getTime()
               });
             }
@@ -1347,6 +1775,8 @@ export default function App() {
           eventEndDate: eventEndDate || undefined,
           description: eventDescription.trim(),
           linkUrl: eventLink.trim() || undefined,
+          isCompleted: eventIsCompleted,
+          isExpired: eventIsCompleted,
           createdAt: Date.now()
         };
         await db.events.put(evObj);
@@ -1364,6 +1794,8 @@ export default function App() {
           eventEndDate: eventEndDate || undefined,
           description: eventDescription.trim(),
           linkUrl: eventLink.trim() || undefined,
+          isCompleted: eventIsCompleted,
+          isExpired: eventIsCompleted,
           createdAt: Date.now()
         };
         await db.events.add(evObj);
@@ -1377,9 +1809,34 @@ export default function App() {
       setEventEndDate('');
       setEventDescription('');
       setEventLink('');
+      setEventIsCompleted(false);
     } catch (err) {
       console.error(err);
       showToast('Failed to schedule/update event.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin toggle Event Completed / Expired status manually
+  const handleToggleEventCompleted = async (eventItem: EventItem) => {
+    setIsLoading(true);
+    try {
+      const newStatus = !(eventItem.isCompleted || eventItem.isExpired);
+      const updated: EventItem = {
+        ...eventItem,
+        isCompleted: newStatus,
+        isExpired: newStatus
+      };
+      await db.events.put(updated);
+      if (isOnline && isCloudConfigured()) {
+        try {
+          await syncEventToCloud(updated);
+        } catch (_) {}
+      }
+      showToast(`Event marked as ${newStatus ? 'Completed / Expired' : 'Active'}!`, 'success');
+    } catch (err) {
+      showToast('Failed to update event status.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -1856,7 +2313,7 @@ export default function App() {
   const cities = shipCountry && shipState ? LOCATION_DATA[shipCountry][shipState] || [] : [];
 
   return (
-    <div className="min-h-screen bg-rose-50/50 text-slate-800 font-sans flex flex-col relative print:bg-white print:text-black">
+    <div className={`min-h-screen font-sans flex flex-col relative print:bg-white print:text-black ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-rose-50/50 text-slate-800'}`}>
 
       {/* Toast Alert Notification */}
       {toast && (
@@ -1886,16 +2343,44 @@ export default function App() {
             <span className="text-2xl font-extrabold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent leading-none">
               KRP Creation
             </span>
-            <span className="text-xs tracking-wider text-rose-500 font-semibold mt-0.5">Ladies Garments</span>
+            <span className="text-xs tracking-wider text-rose-500 font-semibold mt-0.5">{t('tagline')}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-100 bg-white shadow-sm">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Online / Offline pill */}
+          <div className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border shadow-sm ${isDark ? 'border-slate-600 bg-slate-800' : 'border-rose-100 bg-white'}`}>
             <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className={isOnline ? 'text-emerald-600' : 'text-rose-600'}>
-              {isOnline ? 'Online' : 'Offline'}
+            <span className={isOnline ? 'text-emerald-500' : 'text-rose-500'}>
+              {isOnline ? t('online') : t('offline')}
             </span>
+          </div>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={() => setIsDark(prev => !prev)}
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            className={`w-8 h-8 flex items-center justify-center rounded-full border text-sm transition-all shadow-sm cursor-pointer ${isDark ? 'bg-slate-700 border-slate-600 text-yellow-300 hover:bg-slate-600' : 'bg-white border-rose-100 text-slate-600 hover:bg-rose-50'}`}
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
+          {/* Language Selector */}
+          <div className={`flex items-center rounded-full border overflow-hidden shadow-sm text-[10px] font-bold ${isDark ? 'border-slate-600 bg-slate-800' : 'border-rose-100 bg-white'}`}>
+            {(['en', 'bn', 'hi'] as Lang[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                title={l === 'en' ? 'English' : l === 'bn' ? 'বাংলা' : 'हिन्दी'}
+                className={`px-2 py-1 transition-all cursor-pointer ${
+                  lang === l
+                    ? 'bg-rose-600 text-white'
+                    : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-rose-50'
+                }`}
+              >
+                {l === 'en' ? 'EN' : l === 'bn' ? 'বাং' : 'हि'}
+              </button>
+            ))}
           </div>
 
           {user ? (
@@ -1916,35 +2401,35 @@ export default function App() {
               onClick={() => setCurrentPage('login')}
               className="text-xs text-rose-650 hover:text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-100 transition-all cursor-pointer shadow-sm"
             >
-              Sign In
+              {t('signIn')}
             </button>
           )}
         </div>
       </header>
 
       {/* Navigation Tabs */}
-      <nav className="bg-white border-b border-rose-100 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm shadow-sm print:hidden">
+      <nav className={`border-b flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm shadow-sm print:hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-100'}`}>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setCurrentPage('home')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'home' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
               }`}
           >
-            Home
+            {t('home')}
           </button>
           <button
             onClick={() => setCurrentPage('catalog')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'catalog' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
               }`}
           >
-            Catalog
+            {t('catalog')}
           </button>
           <button
             onClick={() => setCurrentPage('cart')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${currentPage === 'cart' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
               }`}
           >
-            Cart
+            {t('cart')}
             {cartItems.length > 0 && (
               <span className="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full font-bold">
                 {cartItems.reduce((acc, i) => acc + i.quantity, 0)}
@@ -1959,7 +2444,7 @@ export default function App() {
               className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'my-orders' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-550 hover:text-slate-700 hover:bg-rose-55'
                 }`}
             >
-              My Orders
+              {t('myOrders')}
             </button>
           )}
 
@@ -1969,7 +2454,7 @@ export default function App() {
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${currentPage === 'contact' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-550 hover:text-slate-700 hover:bg-rose-55'
               }`}
           >
-            Contact Us
+            {t('contactUs')}
           </button>
 
           {/* Admin panel tab is strictly visible only to logged-in admin */}
@@ -1979,7 +2464,7 @@ export default function App() {
               className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${currentPage === 'admin' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-505 hover:text-slate-700 hover:bg-rose-55'
                 }`}
             >
-              <span>Admin Panel</span>
+              <span>{t('adminPanel')}</span>
               {unreadOrdersCount > 0 && (
                 <span className="bg-rose-105 text-rose-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
                   {unreadOrdersCount}
@@ -1997,6 +2482,8 @@ export default function App() {
         {/* Home Landing Page */}
         {currentPage === 'home' && (
           <div className="space-y-1 animate-in fade-in duration-300">
+
+
             {/* Announcements Ticker */}
             {announcementsList.length > 0 && announcementsList[0].content && (
               <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-pink-600 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-rose-500/10 flex items-center gap-3 max-w-2xl mx-auto border border-rose-400/20 animate-pulse">
@@ -2139,41 +2626,69 @@ export default function App() {
             {eventsList.length > 0 && (
               <div className="bg-white border border-rose-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
                 <div className="text-center space-y-2 max-w-xl mx-auto">
-                  <h2 className="text-2xl font-bold tracking-tight text-slate-800 font-serif">Upcoming Events & Exhibitions</h2>
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-800 font-serif">Events & Exhibitions</h2>
                   <p className="text-xs text-slate-450">Join our upcoming product launches, boutique pop-ups, and live event displays.</p>
                 </div>
                 <div className="relative border-l border-rose-150 ml-4 pl-6 space-y-8 py-3">
-                  {eventsList.map((ev) => (
-                    <div key={ev.id} className="relative group">
-                      {/* Timeline dot */}
-                      <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 border border-white shadow-sm ring-4 ring-rose-50" />
-                      <div className="bg-rose-50/20 hover:bg-rose-50/40 border border-rose-100/50 p-5 rounded-2xl transition-all shadow-sm space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-50 pb-2">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 tracking-wider">
-                              {ev.type === 'live' ? '🎥 Live Show' : ev.type === 'exhibition' ? '🎪 Exhibition Pop-Up' : ev.type === 'product_launch' ? '🛍️ Product Launch' : ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special Event'}
+                  {eventsList.map((ev) => {
+                    const isPast = ev.isCompleted || ev.isExpired;
+                    const lastDateStr = ev.eventEndDate || ev.eventDate;
+                    return (
+                      <div key={ev.id} className="relative group">
+                        {/* Timeline dot */}
+                        <span className={`absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border border-white shadow-sm ring-4 ${
+                          isPast ? 'bg-slate-400 ring-slate-100' : 'bg-rose-600 ring-rose-50'
+                        }`} />
+                        <div className={`border p-5 rounded-2xl transition-all shadow-sm space-y-2 ${
+                          isPast
+                            ? 'bg-slate-50/70 border-slate-200/70 opacity-75'
+                            : 'bg-rose-50/20 hover:bg-rose-50/40 border-rose-100/50'
+                        }`}>
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-50/80 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded tracking-wider ${
+                                isPast
+                                  ? 'bg-slate-200 text-slate-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}>
+                                {ev.type === 'live' ? '🎥 Live Show' : ev.type === 'exhibition' ? '🎪 Exhibition Pop-Up' : ev.type === 'product_launch' ? '🛍️ Product Launch' : ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special Event'}
+                              </span>
+                              {isPast && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                                  ✓ Completed / Expired
+                                </span>
+                              )}
+                              <h4 className="font-bold text-sm sm:text-base text-slate-800">{ev.title}</h4>
+                            </div>
+                            <span className={`text-xs font-semibold rounded-lg px-2.5 py-1 shrink-0 border ${
+                              isPast
+                                ? 'text-slate-500 bg-slate-100 border-slate-200'
+                                : 'text-rose-600 bg-rose-50 border-rose-100'
+                            }`}>
+                              📅 {moment(ev.eventDate).format('D MMM YYYY')}
+                              {ev.eventEndDate && ` - ${moment(ev.eventEndDate).format('D MMM YYYY')}`}
+                              {ev.eventEndDate && (
+                                <span className="ml-1.5 font-bold text-[10px] text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded">
+                                  Last Date: {moment(lastDateStr).format('D MMM')}
+                                </span>
+                              )}
                             </span>
-                            <h4 className="font-bold text-sm sm:text-base text-slate-800 mt-1">{ev.title}</h4>
                           </div>
-                          <span className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1 shrink-0">
-                            📅 {moment(ev.eventDate).format('D MMM YYYY')}
-                            {ev.eventEndDate && ` - ${moment(ev.eventEndDate).format('D MMM YYYY')}`}
-                          </span>
+                          <p className="text-xs text-slate-550 leading-relaxed">{ev.description}</p>
+                          {ev.linkUrl && !isPast && (
+                            <a
+                              href={ev.linkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-xs font-bold text-rose-700 hover:text-rose-800 mt-2 hover:underline"
+                            >
+                              Find details & join stream ➜
+                            </a>
+                          )}
                         </div>
-                        <p className="text-xs text-slate-550 leading-relaxed">{ev.description}</p>
-                        {ev.linkUrl && (
-                          <a
-                            href={ev.linkUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-xs font-bold text-rose-700 hover:text-rose-800 mt-2 hover:underline"
-                          >
-                            Find details & join stream ➜
-                          </a>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2919,7 +3434,7 @@ export default function App() {
 
               <div>
                 <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                  Select Admin Representative <span className="text-rose-600 font-bold ml-0.5">*</span>
+                  Select Support Team <span className="text-rose-600 font-bold ml-0.5">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${contactAdminTarget === '7890784816' ? 'bg-rose-50 border-rose-300 font-bold' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
@@ -2932,8 +3447,7 @@ export default function App() {
                       className="accent-rose-600"
                     />
                     <div>
-                      <div className="text-slate-800 text-[11px] leading-tight">Ranu Das</div>
-                      <div className="text-[9px] text-slate-400 font-mono">Admin 1</div>
+                      <div className="text-slate-800 text-[11px] font-medium leading-tight">Support Team 1</div>
                     </div>
                   </label>
 
@@ -2947,8 +3461,7 @@ export default function App() {
                       className="accent-rose-600"
                     />
                     <div>
-                      <div className="text-slate-800 text-[11px] leading-tight">Support</div>
-                      <div className="text-[9px] text-slate-400 font-mono">Admin 2</div>
+                      <div className="text-slate-800 text-[11px] font-medium leading-tight">Support Team 2</div>
                     </div>
                   </label>
                 </div>
@@ -4054,6 +4567,7 @@ export default function App() {
                                     setEventEndDate('');
                                     setEventDescription('');
                                     setEventLink('');
+                                    setEventIsCompleted(false);
                                   }}
                                   className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg transition-colors shadow-sm"
                                 >
@@ -4073,47 +4587,84 @@ export default function App() {
                       </div>
                       <div className="lg:col-span-2">
                         <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-4">
-                          <h3 className="font-bold text-lg border-b border-rose-50 pb-2 text-slate-800">Active Scheduled Timelines</h3>
+                          <div className="flex items-center justify-between border-b border-rose-50 pb-2">
+                            <h3 className="font-bold text-lg text-slate-800">Active & Scheduled Timelines</h3>
+                            <span className="text-[11px] text-slate-450">Passed events auto-expire automatically</span>
+                          </div>
                           {eventsList.length === 0 ? (
                             <p className="text-slate-400 text-xs">No upcoming events scheduled.</p>
                           ) : (
                             <div className="space-y-3">
-                              {eventsList.map((ev) => (
-                                <div key={ev.id} className="bg-rose-50/20 border border-rose-100/60 p-4 rounded-xl flex items-start justify-between gap-4 text-xs shadow-inner">
-                                  <div>
-                                    <span className="inline-block text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 tracking-wider">
-                                      {ev.type}
-                                    </span>
-                                    <h4 className="font-bold text-slate-800 mt-1">{ev.title}</h4>
-                                    <div className="text-slate-450 mt-0.5">
-                                      Date: {ev.eventDate} {ev.eventEndDate && `to ${ev.eventEndDate}`}
+                              {eventsList.map((ev) => {
+                                const isPast = ev.isCompleted || ev.isExpired;
+                                return (
+                                  <div
+                                    key={ev.id}
+                                    className={`p-4 rounded-xl flex items-start justify-between gap-4 text-xs shadow-inner border ${
+                                      isPast
+                                        ? 'bg-slate-50 border-slate-200 opacity-80'
+                                        : 'bg-rose-50/20 border-rose-100/60'
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={`inline-block text-[9px] uppercase font-bold px-2 py-0.5 rounded tracking-wider ${
+                                          isPast ? 'bg-slate-200 text-slate-700' : 'bg-rose-100 text-rose-700'
+                                        }`}>
+                                          {ev.type}
+                                        </span>
+                                        {isPast ? (
+                                          <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 border border-slate-300">
+                                            ✓ Expired / Completed
+                                          </span>
+                                        ) : (
+                                          <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                            ● Active
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h4 className="font-bold text-slate-800 mt-1">{ev.title}</h4>
+                                      <div className="text-slate-450 mt-0.5">
+                                        Date: {ev.eventDate} {ev.eventEndDate && `to ${ev.eventEndDate}`}
+                                      </div>
+                                      <p className="text-slate-500 mt-1 leading-relaxed">{ev.description}</p>
                                     </div>
-                                    <p className="text-slate-500 mt-1 leading-relaxed">{ev.description}</p>
+                                    <div className="flex flex-col gap-1.5 shrink-0">
+                                      <button
+                                        onClick={() => handleToggleEventCompleted(ev)}
+                                        className={`px-2 py-1 rounded font-semibold text-center text-[10px] border transition-colors ${
+                                          isPast
+                                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                        }`}
+                                      >
+                                        {isPast ? 'Mark Active' : 'Mark Completed'}
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingEventId(ev.id);
+                                          setEventTitle(ev.title);
+                                          setEventType(ev.type);
+                                          setEventDate(ev.eventDate);
+                                          setEventEndDate(ev.eventEndDate || '');
+                                          setEventDescription(ev.description);
+                                          setEventLink(ev.linkUrl || '');
+                                          setEventIsCompleted(ev.isCompleted || ev.isExpired || false);
+                                        }}
+                                        className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded font-semibold text-center"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteEvent(ev.id)}
+                                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold text-center"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
                                   </div>
-                                  <div className="flex flex-col gap-1.5 shrink-0">
-                                    <button
-                                      onClick={() => {
-                                        setEditingEventId(ev.id);
-                                        setEventTitle(ev.title);
-                                        setEventType(ev.type);
-                                        setEventDate(ev.eventDate);
-                                        setEventEndDate(ev.eventEndDate || '');
-                                        setEventDescription(ev.description);
-                                        setEventLink(ev.linkUrl || '');
-                                      }}
-                                      className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded font-semibold text-center"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteEvent(ev.id)}
-                                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded font-semibold text-center"
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -6115,6 +6666,54 @@ export default function App() {
           <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.73-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.863-9.764.001-2.614-1.012-5.071-2.853-6.914C16.643 2.086 14.192 1.071 11.997 1.07 6.562 1.07 2.137 5.44 2.135 10.835c-.001 1.701.452 3.361 1.31 4.8l-.946 3.454 3.558-.935zM17.51 14.28c-.297-.15-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
         </svg>
       </a>
+      {/* ===== GLOBAL: Last Day Events Floating Toast Bar (15s auto-dismiss) ===== */}
+      {(() => {
+        if (!eventsList || eventsList.length === 0) return null;
+        if (!lastDayToastVisible) return null;
+        const today = moment().startOf('day');
+
+        // Only show events whose last date == today (ignore expired/completed — today is NOT past)
+        const lastDayEvents = eventsList.filter((ev) => {
+          if (dismissedLastDayEventIds.includes(String(ev.id))) return false;
+          const lastDateRaw = (ev.eventEndDate || ev.eventDate || '').trim();
+          if (!lastDateRaw) return false;
+          const eventDay = moment(lastDateRaw).startOf('day');
+          if (!eventDay.isValid()) return false;
+          return eventDay.isSame(today, 'day');
+        });
+
+        if (lastDayEvents.length === 0) return null;
+
+        const activeIdx = lastDayToastIdx % lastDayEvents.length;
+        const ev = lastDayEvents[activeIdx];
+        const lastDateStr = ev.eventEndDate || ev.eventDate;
+
+        const handleDismiss = () => {
+          const updated = [...dismissedLastDayEventIds, String(ev.id)];
+          setDismissedLastDayEventIds(updated);
+          try { sessionStorage.setItem('dismissed_last_day_event_ids', JSON.stringify(updated)); } catch {}
+          if (updated.length >= lastDayEvents.length) {
+            setLastDayToastVisible(false);
+          } else {
+            setLastDayToastIdx(prev => prev + 1);
+          }
+        };
+
+        return (
+          <LastDayEventToast
+            key={String(ev.id)}
+            ev={ev}
+            lastDateStr={lastDateStr || ''}
+            totalCount={lastDayEvents.length}
+            activeIdx={activeIdx}
+            tLastDay={t('lastDayToday')}
+            tExplore={t('exploreNow')}
+            onDismiss={handleDismiss}
+            onNext={() => setLastDayToastIdx(prev => prev + 1)}
+          />
+        );
+      })()}
+
     </div>
   );
 }

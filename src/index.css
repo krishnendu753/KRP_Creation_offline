@@ -8,7 +8,141 @@
 /* Hide scrollbar for IE, Edge and Firefox */
 * {
   -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
 }
+
+/* ============================================================
+   THEME: CSS Variable Definitions
+   ============================================================ */
+
+:root {
+  --bg-app: #fff5f5;
+  --bg-surface: #ffffff;
+  --bg-surface-alt: #fdf4f4;
+  --bg-input: #ffffff;
+  --border-color: #fecdd3;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --nav-bg: #ffffff;
+}
+
+.dark-mode {
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-alt: #1a2744;
+  --bg-input: #1e293b;
+  --border-color: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --header-bg: rgba(15, 23, 42, 0.97);
+  --nav-bg: #1e293b;
+}
+
+/* ============================================================
+   DARK MODE GLOBAL OVERRIDES
+   ============================================================ */
+
+.dark-mode {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+.dark-mode header {
+  background-color: var(--header-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+.dark-mode nav {
+  background-color: var(--nav-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+.dark-mode .bg-white {
+  background-color: var(--bg-surface) !important;
+}
+
+.dark-mode [class*="bg-rose-50"] {
+  background-color: var(--bg-surface-alt) !important;
+}
+
+.dark-mode [class*="bg-slate-50"] {
+  background-color: var(--bg-surface-alt) !important;
+}
+
+.dark-mode [class*="bg-gray-50"] {
+  background-color: var(--bg-surface-alt) !important;
+}
+
+.dark-mode [class*="bg-amber-50"] {
+  background-color: #1c2a3a !important;
+}
+
+.dark-mode [class*="bg-orange-50"] {
+  background-color: #1c2a3a !important;
+}
+
+.dark-mode [class*="bg-indigo-50"] {
+  background-color: #1e2f4b !important;
+}
+
+.dark-mode [class*="bg-green-50"] {
+  background-color: #0f2318 !important;
+}
+
+.dark-mode [class*="bg-emerald-50"] {
+  background-color: #0f2318 !important;
+}
+
+.dark-mode [class*="text-slate-800"],
+.dark-mode [class*="text-slate-700"],
+.dark-mode [class*="text-slate-900"] {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode [class*="text-slate-600"],
+.dark-mode [class*="text-slate-500"] {
+  color: var(--text-secondary) !important;
+}
+
+.dark-mode [class*="text-slate-400"],
+.dark-mode [class*="text-slate-300"] {
+  color: var(--text-muted) !important;
+}
+
+.dark-mode [class*="border-rose-100"] {
+  border-color: var(--border-color) !important;
+}
+
+.dark-mode [class*="border-slate-100"],
+.dark-mode [class*="border-slate-200"] {
+  border-color: var(--border-color) !important;
+}
+
+.dark-mode [class*="border-gray-100"],
+.dark-mode [class*="border-gray-200"] {
+  border-color: var(--border-color) !important;
+}
+
+.dark-mode input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.dark-mode textarea,
+.dark-mode select {
+  background-color: var(--bg-input) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-mode input::placeholder,
+.dark-mode textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+@media print {
+  .dark-mode {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+}
+

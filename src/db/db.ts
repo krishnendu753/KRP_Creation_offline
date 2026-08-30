@@ -103,6 +103,8 @@ export interface EventItem {
   description: string;
   linkUrl?: string;
   createdAt: number;
+  isCompleted?: boolean; // Completed / Expired status
+  isExpired?: boolean;
 }
 
 export interface Category {
