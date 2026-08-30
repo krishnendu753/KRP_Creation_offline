@@ -2317,20 +2317,25 @@ export default function App() {
 
       {/* Toast Alert Notification */}
       {toast && (
-        <div className="fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[9998] max-w-sm w-auto sm:w-full bg-white border border-rose-100 rounded-xl shadow-2xl p-3 sm:p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden">
-          <span className={`w-3 h-3 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
-            }`} />
-          <div className="text-xs sm:text-sm font-medium text-slate-700 flex-1">{toast.message}</div>
-          <button onClick={() => setToast(null)} className="ml-auto text-slate-400 hover:text-slate-600 font-bold shrink-0">✕</button>
+        <div className={`fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[9998] max-w-sm w-auto sm:w-full border rounded-xl shadow-2xl p-3 sm:p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden ${
+          isDark ? 'bg-slate-800 border-slate-700 text-slate-100 shadow-black/50' : 'bg-white border-rose-100 text-slate-800'
+        }`}>
+          <span className={`w-3 h-3 rounded-full shrink-0 ${
+            toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
+          }`} />
+          <div className={`text-xs sm:text-sm font-medium flex-1 ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{toast.message}</div>
+          <button onClick={() => setToast(null)} className={`ml-auto font-bold shrink-0 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-600'}`}>✕</button>
         </div>
       )}
 
       {/* Fullscreen Loader Overlay */}
       {isLoading && (
-        <div className="fixed inset-0 z-55 flex flex-col items-center justify-center bg-slate-955/20 backdrop-blur-[2px] print:hidden">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl border border-rose-50 flex flex-col items-center gap-3">
+        <div className="fixed inset-0 z-55 flex flex-col items-center justify-center bg-slate-955/40 backdrop-blur-[2px] print:hidden">
+          <div className={`p-6 rounded-2xl shadow-2xl border flex flex-col items-center gap-3 ${
+            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-50'
+          }`}>
             <span className="w-10 h-10 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-bold text-rose-700 tracking-wider uppercase animate-pulse">Processing...</span>
+            <span className="text-xs font-bold text-rose-500 tracking-wider uppercase animate-pulse">Processing...</span>
           </div>
         </div>
       )}
@@ -2492,24 +2497,36 @@ export default function App() {
 
             {/* Big Notice Floating Pinned Card */}
             {announcementsList.length > 0 && announcementsList[0].bigNotice && showBigNotice && (
-              <div className="fixed bottom-4 right-4 z-50 p-4 max-w-sm w-[calc(100vw-2rem)] bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl shadow-2xl overflow-hidden text-slate-800 animate-in slide-in-from-bottom-5 duration-300 print:hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-200/20 rounded-full blur-xl pointer-events-none" />
+              <div className={`fixed bottom-4 right-4 z-50 p-4 max-w-sm w-[calc(100vw-2rem)] border-2 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-300 print:hidden ${
+                isDark
+                  ? 'bg-slate-800/95 border-amber-500/40 text-slate-100 backdrop-blur-md'
+                  : 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 text-slate-800'
+              }`}>
+                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-400/10 rounded-full blur-xl pointer-events-none" />
 
                 <button
                   onClick={() => setShowBigNotice(false)}
-                  className="absolute top-2.5 right-2.5 bg-amber-100/80 hover:bg-amber-200 text-amber-800 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-amber-200/50"
+                  className={`absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-all border ${
+                    isDark
+                      ? 'bg-slate-700 hover:bg-slate-600 text-amber-400 border-slate-600'
+                      : 'bg-amber-100/80 hover:bg-amber-200 text-amber-800 border-amber-200/50'
+                  }`}
                   title="Close Notice"
                 >
                   ✕
                 </button>
 
-                <div className="flex items-center gap-2 text-amber-900 border-b border-amber-200/50 pb-2 mb-2">
+                <div className={`flex items-center gap-2 border-b pb-2 mb-2 ${
+                  isDark ? 'text-amber-400 border-slate-700' : 'text-amber-900 border-amber-200/50'
+                }`}>
                   <span className="text-base animate-bounce">📌</span>
                   <h3 className="font-extrabold text-xs uppercase tracking-wider font-serif">Our Notice/Announcement</h3>
                 </div>
 
                 <div className="max-h-36 overflow-y-auto pr-1">
-                  <p className="text-slate-800 text-[11px] sm:text-xs font-bold leading-relaxed whitespace-pre-wrap">
+                  <p className={`text-[11px] sm:text-xs font-bold leading-relaxed whitespace-pre-wrap ${
+                    isDark ? 'text-slate-200' : 'text-slate-800'
+                  }`}>
                     {announcementsList[0].bigNotice}
                   </p>
                 </div>

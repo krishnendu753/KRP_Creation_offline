@@ -24,25 +24,26 @@
   --text-primary: #1e293b;
   --text-secondary: #475569;
   --text-muted: #94a3b8;
-  --header-bg: rgba(255, 255, 255, 0.92);
+  --header-bg: rgba(255, 255, 255, 0.95);
   --nav-bg: #ffffff;
 }
 
 .dark-mode {
-  --bg-app: #0f172a;
-  --bg-surface: #1e293b;
-  --bg-surface-alt: #1a2744;
-  --bg-input: #1e293b;
-  --border-color: #334155;
-  --text-primary: #f1f5f9;
+  --bg-app: #090e17;
+  --bg-surface: #131c2e;
+  --bg-surface-alt: #1a263d;
+  --bg-input: #152238;
+  --border-color: #27364f;
+  --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
-  --text-muted: #64748b;
-  --header-bg: rgba(15, 23, 42, 0.97);
-  --nav-bg: #1e293b;
+  --text-muted: #94a3b8;
+  --header-bg: rgba(9, 14, 23, 0.96);
+  --nav-bg: #131c2e;
+  color-scheme: dark;
 }
 
 /* ============================================================
-   DARK MODE GLOBAL OVERRIDES
+   DARK MODE GLOBAL OVERRIDES — Comprehensive High Contrast
    ============================================================ */
 
 .dark-mode {
@@ -50,82 +51,239 @@
   color: var(--text-primary);
 }
 
+/* ── Base Headings, Paragraphs, Labels ── */
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode h4,
+.dark-mode h5,
+.dark-mode h6 {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode label {
+  color: var(--text-secondary) !important;
+}
+
+/* ── Header, Nav, Footer ── */
 .dark-mode header {
   background-color: var(--header-bg) !important;
   border-color: var(--border-color) !important;
 }
-
 .dark-mode nav {
   background-color: var(--nav-bg) !important;
   border-color: var(--border-color) !important;
 }
-
-.dark-mode .bg-white {
+.dark-mode footer {
   background-color: var(--bg-surface) !important;
-}
-
-.dark-mode [class*="bg-rose-50"] {
-  background-color: var(--bg-surface-alt) !important;
-}
-
-.dark-mode [class*="bg-slate-50"] {
-  background-color: var(--bg-surface-alt) !important;
-}
-
-.dark-mode [class*="bg-gray-50"] {
-  background-color: var(--bg-surface-alt) !important;
-}
-
-.dark-mode [class*="bg-amber-50"] {
-  background-color: #1c2a3a !important;
-}
-
-.dark-mode [class*="bg-orange-50"] {
-  background-color: #1c2a3a !important;
-}
-
-.dark-mode [class*="bg-indigo-50"] {
-  background-color: #1e2f4b !important;
-}
-
-.dark-mode [class*="bg-green-50"] {
-  background-color: #0f2318 !important;
-}
-
-.dark-mode [class*="bg-emerald-50"] {
-  background-color: #0f2318 !important;
-}
-
-.dark-mode [class*="text-slate-800"],
-.dark-mode [class*="text-slate-700"],
-.dark-mode [class*="text-slate-900"] {
-  color: var(--text-primary) !important;
-}
-
-.dark-mode [class*="text-slate-600"],
-.dark-mode [class*="text-slate-500"] {
-  color: var(--text-secondary) !important;
-}
-
-.dark-mode [class*="text-slate-400"],
-.dark-mode [class*="text-slate-300"] {
+  border-color: var(--border-color) !important;
   color: var(--text-muted) !important;
 }
 
-.dark-mode [class*="border-rose-100"] {
-  border-color: var(--border-color) !important;
+/* ── Surfaces & Card Backgrounds ── */
+.dark-mode .bg-white,
+.dark-mode [class*="bg-white"] {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary);
 }
 
+.dark-mode [class*="bg-slate-50"],
+.dark-mode [class*="bg-slate-100"],
+.dark-mode [class*="bg-slate-200"],
+.dark-mode [class*="bg-gray-50"],
+.dark-mode [class*="bg-gray-100"],
+.dark-mode [class*="bg-gray-200"],
+.dark-mode [class*="bg-zinc-50"],
+.dark-mode [class*="bg-zinc-100"] {
+  background-color: var(--bg-surface-alt) !important;
+}
+
+.dark-mode [class*="bg-slate-800"],
+.dark-mode [class*="bg-slate-900"],
+.dark-mode [class*="bg-slate-950"] {
+  background-color: var(--bg-surface) !important;
+}
+
+.dark-mode [class*="bg-slate-700"] {
+  background-color: #24344d !important;
+}
+
+/* ── Rose & Pink Tints (Boutique Theme) ── */
+.dark-mode [class*="bg-rose-50"],
+.dark-mode [class*="bg-pink-50"] {
+  background-color: rgba(225, 29, 72, 0.12) !important;
+}
+.dark-mode [class*="bg-rose-100"],
+.dark-mode [class*="bg-pink-100"] {
+  background-color: rgba(225, 29, 72, 0.2) !important;
+}
+
+/* ── Amber / Orange Warnings & Notices ── */
+.dark-mode [class*="bg-amber-50"],
+.dark-mode [class*="bg-orange-50"],
+.dark-mode [class*="bg-yellow-50"] {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+}
+.dark-mode [class*="bg-amber-100"],
+.dark-mode [class*="bg-orange-100"] {
+  background-color: rgba(245, 158, 11, 0.22) !important;
+}
+
+/* ── Emerald / Green Success Cards ── */
+.dark-mode [class*="bg-emerald-50"],
+.dark-mode [class*="bg-green-50"] {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+}
+.dark-mode [class*="bg-emerald-100"],
+.dark-mode [class*="bg-green-100"] {
+  background-color: rgba(16, 185, 129, 0.22) !important;
+}
+
+/* ── Blue & Indigo Tints ── */
+.dark-mode [class*="bg-blue-50"],
+.dark-mode [class*="bg-indigo-50"],
+.dark-mode [class*="bg-sky-50"] {
+  background-color: rgba(59, 130, 246, 0.14) !important;
+}
+.dark-mode [class*="bg-blue-100"],
+.dark-mode [class*="bg-indigo-100"] {
+  background-color: rgba(59, 130, 246, 0.22) !important;
+}
+
+/* ── Red Delete / Danger Tints ── */
+.dark-mode [class*="bg-red-50"] {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+}
+.dark-mode [class*="bg-red-100"] {
+  background-color: rgba(239, 68, 68, 0.22) !important;
+}
+
+/* ── All Text Colors: Dark to High-Contrast Light ── */
+.dark-mode [class*="text-slate-9"],
+.dark-mode [class*="text-slate-8"],
+.dark-mode [class*="text-slate-7"],
+.dark-mode [class*="text-gray-9"],
+.dark-mode [class*="text-gray-8"],
+.dark-mode [class*="text-gray-7"],
+.dark-mode [class*="text-zinc-9"],
+.dark-mode [class*="text-zinc-8"],
+.dark-mode [class*="text-zinc-7"],
+.dark-mode [class*="text-stone-9"],
+.dark-mode [class*="text-stone-8"],
+.dark-mode [class*="text-stone-7"],
+.dark-mode [class*="text-neutral-9"],
+.dark-mode [class*="text-neutral-8"],
+.dark-mode [class*="text-neutral-7"] {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode [class*="text-slate-6"],
+.dark-mode [class*="text-slate-5"],
+.dark-mode [class*="text-gray-6"],
+.dark-mode [class*="text-gray-5"],
+.dark-mode [class*="text-zinc-6"],
+.dark-mode [class*="text-zinc-5"] {
+  color: var(--text-secondary) !important;
+}
+
+.dark-mode [class*="text-slate-4"],
+.dark-mode [class*="text-slate-3"],
+.dark-mode [class*="text-gray-4"],
+.dark-mode [class*="text-gray-3"],
+.dark-mode [class*="text-zinc-4"],
+.dark-mode [class*="text-zinc-3"] {
+  color: var(--text-muted) !important;
+}
+
+/* ── High-Contrast Colored Text in Dark Mode ── */
+.dark-mode [class*="text-amber-6"],
+.dark-mode [class*="text-amber-7"],
+.dark-mode [class*="text-amber-8"],
+.dark-mode [class*="text-amber-9"],
+.dark-mode [class*="text-yellow-6"],
+.dark-mode [class*="text-yellow-7"],
+.dark-mode [class*="text-yellow-8"] {
+  color: #fcd34d !important;
+}
+
+.dark-mode [class*="text-rose-7"],
+.dark-mode [class*="text-rose-8"],
+.dark-mode [class*="text-rose-9"] {
+  color: #fb7185 !important;
+}
+
+.dark-mode [class*="text-emerald-7"],
+.dark-mode [class*="text-emerald-8"],
+.dark-mode [class*="text-emerald-9"],
+.dark-mode [class*="text-green-7"],
+.dark-mode [class*="text-green-8"] {
+  color: #34d399 !important;
+}
+
+.dark-mode [class*="text-blue-7"],
+.dark-mode [class*="text-blue-8"],
+.dark-mode [class*="text-blue-9"],
+.dark-mode [class*="text-sky-7"],
+.dark-mode [class*="text-sky-8"] {
+  color: #60a5fa !important;
+}
+
+.dark-mode [class*="text-red-7"],
+.dark-mode [class*="text-red-8"],
+.dark-mode [class*="text-red-9"] {
+  color: #f87171 !important;
+}
+
+/* ── Borders in Dark Mode ── */
+.dark-mode [class*="border-rose-50"],
+.dark-mode [class*="border-rose-100"],
+.dark-mode [class*="border-rose-150"],
+.dark-mode [class*="border-rose-200"],
 .dark-mode [class*="border-slate-100"],
-.dark-mode [class*="border-slate-200"] {
-  border-color: var(--border-color) !important;
-}
-
+.dark-mode [class*="border-slate-200"],
+.dark-mode [class*="border-slate-300"],
 .dark-mode [class*="border-gray-100"],
-.dark-mode [class*="border-gray-200"] {
+.dark-mode [class*="border-gray-200"],
+.dark-mode [class*="border-white"] {
   border-color: var(--border-color) !important;
 }
 
+.dark-mode [class*="border-amber-100"],
+.dark-mode [class*="border-amber-200"] {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+.dark-mode [class*="border-emerald-100"],
+.dark-mode [class*="border-emerald-200"] {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+.dark-mode [class*="border-blue-100"],
+.dark-mode [class*="border-blue-200"] {
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+.dark-mode [class*="border-red-100"],
+.dark-mode [class*="border-red-200"] {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+/* ── Modals & Floating Popups ── */
+.dark-mode [class*="fixed"] [class*="bg-white"],
+.dark-mode [class*="fixed"] [class*="rounded-2xl"],
+.dark-mode [class*="fixed"] [class*="rounded-xl"] {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Floating Big Notice in dark mode */
+.dark-mode [class*="from-amber-50"][class*="to-orange-50"] {
+  background: linear-gradient(135deg, #182234, #211c12) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+/* ── Form Inputs, Textarea, Select, Checkboxes ── */
 .dark-mode input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 .dark-mode textarea,
 .dark-mode select {
@@ -137,6 +295,32 @@
 .dark-mode input::placeholder,
 .dark-mode textarea::placeholder {
   color: var(--text-muted) !important;
+}
+
+.dark-mode select option {
+  background-color: #131c2e !important;
+  color: #f8fafc !important;
+}
+
+/* ── Buttons, Badges, Tabs ── */
+.dark-mode [class*="hover:bg-rose-50"]:hover {
+  background-color: rgba(225, 29, 72, 0.2) !important;
+}
+.dark-mode [class*="hover:bg-slate-50"]:hover,
+.dark-mode [class*="hover:bg-slate-100"]:hover,
+.dark-mode [class*="hover:bg-gray-50"]:hover {
+  background-color: #1e2c45 !important;
+}
+
+.dark-mode [class*="hover:text-slate-700"]:hover,
+.dark-mode [class*="hover:text-slate-800"]:hover {
+  color: var(--text-primary) !important;
+}
+
+/* ── Scrollbars & Selection ── */
+.dark-mode ::selection {
+  background-color: #be123c;
+  color: #ffffff;
 }
 
 @media print {
