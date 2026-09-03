@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -557,7 +557,6 @@ function OrderStatusTracker({
         {ORDER_STEPS.map((step, idx) => {
           const isDone = idx < activeStepIdx || (idx === activeStepIdx && order.status === 'delivered');
           const isCurrent = idx === activeStepIdx && order.status !== 'delivered';
-          const isUpcoming = idx > activeStepIdx;
 
           return (
             <div key={step.key} className="flex flex-col items-center text-center relative group">
