@@ -864,12 +864,12 @@ export default function App() {
 
   // Intercept back button and swipe gestures to show exit confirmation popup
   useEffect(() => {
-    // Push an initial dummy state into history so the first back action triggers popstate instead of exiting
-    window.history.pushState({ app: 'krp_creation' }, '');
+    // Push one sentinel state so first hardware-back triggers popstate
+    window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
 
-    const handlePopState = () => {
-      // Re-push history entry so the browser doesn't close on immediate subsequent back clicks
-      window.history.pushState({ app: 'krp_creation' }, '');
+    const handlePopState = (e: PopStateEvent) => {
+      // Repush so further back taps also go through popstate
+      window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
       setIsExitConfirmOpen(true);
     };
 
@@ -877,7 +877,8 @@ export default function App() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
 
   // Safeguard: Preselect first valid database category if selected one is removed or uninitialized
@@ -7073,15 +7074,28 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   setIsExitConfirmOpen(false);
-                  // Attempt native window close if supported, or navigate back in history
+
+                  // For PWA installed on Android: drain all pushed history states so the
+                  // WebView's back stack empties and the OS closes the app naturally.
+                  // We track how many entries we pushed (at least 2: initial + repush on each popstate).
+                  // Using a large negative offset is safe — go() clamps at the stack boundary.
+                  const histLen = window.history.length;
+
+                  // Try Capacitor / Cordova native exit first
                   try {
-                    window.close();
+                    const nav = navigator as any;
+                    if (nav.app && typeof nav.app.exitApp === 'function') {
+                      nav.app.exitApp();
+                      return;
+                    }
                   } catch { }
-                  // If window.close() is blocked by browser security (scripts can only close windows opened by scripts),
-                  // navigate back through history
-                  setTimeout(() => {
-                    window.history.go(-2);
-                  }, 100);
+
+                  // Try window.close() — works when the PWA was launched via a script (rare but try)
+                  try { window.close(); } catch { }
+
+                  // PWA standalone mode: go back far enough to let OS handle the exit
+                  // The sentinel states we pushed are on top; going back past them exits
+                  window.history.go(-(histLen + 2));
                 }}
                 className="flex-1 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95"
               >
