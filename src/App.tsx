@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -602,6 +602,60 @@ function OrderStatusTracker({
   );
 }
 
+// ============================================================
+// KRPLoader — Animated Brand Splash / Page Loader
+// ============================================================
+function KRPLoader({
+  isDark,
+  message,
+  exitAnimation,
+  isOverlay
+}: {
+  isDark: boolean;
+  message?: string;
+  exitAnimation?: boolean;
+  isOverlay?: boolean;
+}) {
+  return (
+    <div
+      className={`krp-loader-overlay${isDark ? ' dark-mode' : ''}${exitAnimation ? ' krp-loader-exit' : ''}`}
+      style={
+        isOverlay
+          ? {
+              background: isDark ? 'rgba(9,14,23,0.88)' : 'rgba(255,240,243,0.88)',
+              backdropFilter: 'blur(8px)'
+            }
+          : undefined
+      }
+    >
+      {/* Animated rings + logo */}
+      <div className="krp-logo-container">
+        <div className="krp-ring-outer" />
+        <div className="krp-ring-inner" />
+        <img src="/logo.jpg" alt="KRP Creation" className="krp-logo-img" />
+      </div>
+
+      {/* Brand name + tagline */}
+      <div className="krp-brand">
+        <div className="krp-brand-name">KRP Creation</div>
+        <div className="krp-brand-tagline">Fashion · Style · Quality</div>
+
+        {/* Bouncing dots */}
+        <div className="krp-dots">
+          <div className="krp-dot" />
+          <div className="krp-dot" />
+          <div className="krp-dot" />
+        </div>
+
+        {/* Optional message */}
+        {message && (
+          <div className="krp-loading-text">{message}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
 
   const { user, login: setAuthSession, logout } = useAuth();
@@ -797,6 +851,13 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
 
+  // Splash screen: show on first load, hide after 2s
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const [splashExiting, setSplashExiting] = useState(false);
+
+  // Ref to track how many pushState calls we made — used for proper PWA exit
+  const pushStateCountRef = useRef(0);
+
   // Live Query from Dexie
   const products = useLiveQuery(() => db.products.toArray()) || [];
   const pendingOrders = useLiveQuery(() => db.orders.where('status').equals('pending_sync').toArray()) || [];
@@ -862,14 +923,27 @@ export default function App() {
     localStorage.setItem('app_lang', lang);
   }, [lang]);
 
+  // Splash screen: auto-hide after 2.2s with exit animation
+  useEffect(() => {
+    const exitTimer = setTimeout(() => {
+      setSplashExiting(true);
+      // After exit animation completes, unmount
+      setTimeout(() => setIsSplashVisible(false), 450);
+    }, 2200);
+    return () => clearTimeout(exitTimer);
+  }, []);
+
   // Intercept back button and swipe gestures to show exit confirmation popup
   useEffect(() => {
     // Push one sentinel state so first hardware-back triggers popstate
+    // and track how many we push to drain them all on real exit
     window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
+    pushStateCountRef.current += 1;
 
     const handlePopState = () => {
       // Repush so further back taps also go through popstate
       window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
+      pushStateCountRef.current += 1;
       setIsExitConfirmOpen(true);
     };
 
@@ -2586,6 +2660,16 @@ export default function App() {
 
   return (
     <div className={`min-h-screen font-sans flex flex-col relative print:bg-white print:text-black overflow-x-hidden ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-rose-50/50 text-slate-800'}`}>
+
+      {/* ✨ KRP Creation Animated Splash Loader — shown on first load */}
+      {isSplashVisible && (
+        <KRPLoader isDark={isDark} message="Loading your store..." exitAnimation={splashExiting} />
+      )}
+
+      {/* ⏳ KRP Operation Loader — shown during async operations */}
+      {isLoading && !isSplashVisible && (
+        <KRPLoader isDark={isDark} message="Please wait..." isOverlay />
+      )}
 
       {/* Toast Alert Notification */}
       {toast && (
@@ -7075,27 +7159,41 @@ export default function App() {
                 onClick={() => {
                   setIsExitConfirmOpen(false);
 
-                  // For PWA installed on Android: drain all pushed history states so the
-                  // WebView's back stack empties and the OS closes the app naturally.
-                  // We track how many entries we pushed (at least 2: initial + repush on each popstate).
-                  // Using a large negative offset is safe — go() clamps at the stack boundary.
-                  const histLen = window.history.length;
-
-                  // Try Capacitor / Cordova native exit first
+                  // 1. Try Native Cordova / Capacitor / Electron exit
                   try {
                     const nav = navigator as any;
                     if (nav.app && typeof nav.app.exitApp === 'function') {
                       nav.app.exitApp();
                       return;
                     }
+                    if (nav.device && typeof nav.device.exitApp === 'function') {
+                      nav.device.exitApp();
+                      return;
+                    }
                   } catch { }
 
-                  // Try window.close() — works when the PWA was launched via a script (rare but try)
-                  try { window.close(); } catch { }
+                  // 2. Try window.close() (standard for popups / opened tabs / webviews with allowScriptsToClose)
+                  try {
+                    window.close();
+                  } catch { }
 
-                  // PWA standalone mode: go back far enough to let OS handle the exit
-                  // The sentinel states we pushed are on top; going back past them exits
-                  window.history.go(-(histLen + 2));
+                  // 3. For Standalone PWA / Android Chrome webview:
+                  // Drain all pushed history states and exit
+                  const totalPushes = pushStateCountRef.current || 1;
+                  const histLen = window.history.length;
+                  const backSteps = Math.max(totalPushes + 2, histLen + 2);
+
+                  try {
+                    window.history.go(-backSteps);
+                  } catch { }
+
+                  // 4. Ultimate fallback if browser prevents closing: redirect to empty page / close window via self
+                  setTimeout(() => {
+                    try {
+                      window.open('', '_self', '');
+                      window.close();
+                    } catch { }
+                  }, 150);
                 }}
                 className="flex-1 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95"
               >
