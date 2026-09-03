@@ -850,10 +850,14 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
+  const [isAppExited, setIsAppExited] = useState(false);
 
   // Splash screen: show on first load, hide after 2s
   const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [splashExiting, setSplashExiting] = useState(false);
+
+  // Flag to know when we are performing real exit to prevent popstate intercept
+  const isExitingRef = useRef(false);
 
   // Ref to track how many pushState calls we made — used for proper PWA exit
   const pushStateCountRef = useRef(0);
@@ -935,12 +939,16 @@ export default function App() {
 
   // Intercept back button and swipe gestures to show exit confirmation popup
   useEffect(() => {
+    if (isExitingRef.current) return;
+
     // Push one sentinel state so first hardware-back triggers popstate
     // and track how many we push to drain them all on real exit
     window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
     pushStateCountRef.current += 1;
 
     const handlePopState = () => {
+      if (isExitingRef.current) return;
+
       // Repush so further back taps also go through popstate
       window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
       pushStateCountRef.current += 1;
@@ -7158,6 +7166,8 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   setIsExitConfirmOpen(false);
+                  isExitingRef.current = true;
+                  setIsAppExited(true);
 
                   // 1. Try Native Cordova / Capacitor / Electron exit
                   try {
@@ -7172,34 +7182,77 @@ export default function App() {
                     }
                   } catch { }
 
-                  // 2. Try window.close() (standard for popups / opened tabs / webviews with allowScriptsToClose)
+                  // 2. Direct window close
                   try {
                     window.close();
                   } catch { }
 
-                  // 3. For Standalone PWA / Android Chrome webview:
-                  // Drain all pushed history states and exit
-                  const totalPushes = pushStateCountRef.current || 1;
-                  const histLen = window.history.length;
-                  const backSteps = Math.max(totalPushes + 2, histLen + 2);
-
+                  // 3. Script-opened tab / browser window close trick
                   try {
-                    window.history.go(-backSteps);
+                    window.open('', '_self', '');
+                    window.close();
                   } catch { }
 
-                  // 4. Ultimate fallback if browser prevents closing: redirect to empty page / close window via self
+                  // 4. For PWA / mobile browser back-stack drainage
+                  const totalPushes = pushStateCountRef.current || 1;
+                  const histLen = window.history.length;
+                  const backSteps = Math.max(totalPushes + 5, histLen + 5);
+
                   setTimeout(() => {
                     try {
-                      window.open('', '_self', '');
-                      window.close();
+                      window.history.go(-backSteps);
                     } catch { }
-                  }, 150);
+                  }, 50);
+
+                  // 5. Fallback navigation for standalone browser tab
+                  setTimeout(() => {
+                    try {
+                      if (document.visibilityState === 'visible') {
+                        window.location.replace('about:blank');
+                      }
+                    } catch { }
+                  }, 400);
                 }}
                 className="flex-1 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95"
               >
                 {t('exitLeaveBtn')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* App Exited Goodbye Screen (Fallback when browser forbids tab closing directly) */}
+      {isAppExited && (
+        <div className={`fixed inset-0 z-[10000] flex flex-col items-center justify-center p-6 text-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-900 text-white'}`}>
+          <div className="w-20 h-20 rounded-full border-2 border-rose-500/40 flex items-center justify-center mb-4 bg-rose-950/30">
+            <img src="/logo.jpg" alt="KRP Creation" className="w-12 h-12 rounded-full object-cover" />
+          </div>
+          <h2 className="text-xl font-bold mb-1">App Closed</h2>
+          <p className="text-xs text-slate-400 mb-6 max-w-xs">
+            Thank you for visiting KRP Creation. You can now safely close this browser tab or return to your device home screen.
+          </p>
+          <div className="flex flex-col gap-2.5 w-full max-w-xs">
+            <button
+              onClick={() => {
+                try {
+                  window.open('', '_self', '');
+                  window.close();
+                } catch { }
+              }}
+              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-all shadow-lg active:scale-95"
+            >
+              Close Tab Now
+            </button>
+            <button
+              onClick={() => {
+                isExitingRef.current = false;
+                setIsAppExited(false);
+              }}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2 px-4 rounded-xl text-xs transition-all border border-slate-700"
+            >
+              Reopen Store
+            </button>
           </div>
         </div>
       )}
