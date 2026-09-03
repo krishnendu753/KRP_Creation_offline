@@ -867,7 +867,7 @@ export default function App() {
     // Push one sentinel state so first hardware-back triggers popstate
     window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
 
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       // Repush so further back taps also go through popstate
       window.history.pushState({ app: 'krp_creation', page: currentPage }, '');
       setIsExitConfirmOpen(true);
