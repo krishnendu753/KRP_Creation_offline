@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -90,11 +90,23 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     sgst: 'SGST',
     grandTotal: 'Grand Total',
     proceedToCheckout: 'Proceed to Checkout',
-    // Orders
+    // Orders & Tracking
     orderId: 'Order ID',
     orderDate: 'Order Date',
     status: 'Status',
     noOrders: 'No orders found.',
+    orderTracking: 'Product Delivery Status',
+    stepPlaced: 'Order Placed',
+    stepApproved: 'Payment Approved',
+    stepPacked: 'Packed & Ready',
+    stepShipped: 'Shipped',
+    stepOutDelivery: 'Out for Delivery',
+    stepDelivered: 'Delivered',
+    stepRejected: 'Order Rejected',
+    stepCancelled: 'Order Cancelled',
+    stepAwaitingApproval: 'Awaiting Payment Approval',
+    stepPendingSync: 'Queued Offline',
+    updateStatusBtn: 'Update Product Status',
     // Contact
     contactTitle: 'Contact Us',
     contactSubtitle: 'We\'re here to help. Reach out via WhatsApp!',
@@ -126,6 +138,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     confirm: 'Confirm',
     loading: 'Loading…',
     processing: 'Processing...',
+    exitModalTitle: 'Exit KRP Creation?',
+    exitModalDesc: 'Are you sure you want to exit the application?',
+    exitStayBtn: 'Stay on App',
+    exitLeaveBtn: 'Exit App',
   },
   bn: {
     // Header
@@ -169,11 +185,23 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     sgst: 'এসজিএসটি',
     grandTotal: 'মোট মূল্য',
     proceedToCheckout: 'চেকআউটে যান',
-    // Orders
+    // Orders & Tracking
     orderId: 'অর্ডার আইডি',
     orderDate: 'অর্ডারের তারিখ',
     status: 'স্ট্যাটাস',
     noOrders: 'কোনো অর্ডার পাওয়া যায়নি।',
+    orderTracking: 'পণ্য ডেলিভারি স্ট্যাটাস',
+    stepPlaced: 'অর্ডার সম্পন্ন',
+    stepApproved: 'পেমেন্ট অনুমোদিত',
+    stepPacked: 'প্যাকেজিং সম্পন্ন',
+    stepShipped: 'শিপিং শুরু হয়েছে',
+    stepOutDelivery: 'ডেলিভারির জন্য বের হয়েছে',
+    stepDelivered: 'ডেলিভারি সম্পন্ন',
+    stepRejected: 'অর্ডার বাতিল',
+    stepCancelled: 'গ্রাহক দ্বারা বাতিল',
+    stepAwaitingApproval: 'পেমেন্ট অনুমোদনের অপেক্ষায়',
+    stepPendingSync: 'অফলাইনে সংরক্ষিত',
+    updateStatusBtn: 'স্ট্যাটাস আপডেট করুন',
     // Contact
     contactTitle: 'যোগাযোগ করুন',
     contactSubtitle: 'আমরা সাহায্য করতে প্রস্তুত। হোয়াটসঅ্যাপে যোগাযোগ করুন!',
@@ -205,6 +233,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     confirm: 'নিশ্চিত করুন',
     loading: 'লোড হচ্ছে…',
     processing: 'প্রক্রিয়া করা হচ্ছে...',
+    exitModalTitle: 'KRP Creation থেকে বের হবেন?',
+    exitModalDesc: 'আপনি কি নিশ্চিত যে অ্যাপ্লিকেশন থেকে প্রস্থান করতে চান?',
+    exitStayBtn: 'অ্যাপে থাকুন',
+    exitLeaveBtn: 'প্রস্থান করুন',
   },
   hi: {
     // Header
@@ -248,11 +280,23 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     sgst: 'एसजीएसटी',
     grandTotal: 'कुल राशि',
     proceedToCheckout: 'चेकआउट करें',
-    // Orders
+    // Orders & Tracking
     orderId: 'ऑर्डर आईडी',
     orderDate: 'ऑर्डर की तारीख',
     status: 'स्थिति',
     noOrders: 'कोई ऑर्डर नहीं मिला।',
+    orderTracking: 'उत्पाद डिलीवरी स्थिति',
+    stepPlaced: 'ऑर्डर दर्ज हुआ',
+    stepApproved: 'भुगतान स्वीकृत',
+    stepPacked: 'पैकिंग पूर्ण',
+    stepShipped: 'भेजा गया (Shipped)',
+    stepOutDelivery: 'डिलीवरी के लिए निकला',
+    stepDelivered: 'सफलतापूर्वक डिलीवर हुआ',
+    stepRejected: 'ऑर्डर अस्वीकृत',
+    stepCancelled: 'ग्राहक द्वारा रद्द',
+    stepAwaitingApproval: 'भुगतान सत्यापन की प्रतीक्षा',
+    stepPendingSync: 'ऑफलाइन कतार में',
+    updateStatusBtn: 'स्थिति अपडेट करें',
     // Contact
     contactTitle: 'संपर्क करें',
     contactSubtitle: 'हम सहायता के लिए यहाँ हैं। व्हाट्सऐप पर संपर्क करें!',
@@ -284,6 +328,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     confirm: 'पुष्टि करें',
     loading: 'लोड हो रहा है…',
     processing: 'प्रक्रिया हो रही है...',
+    exitModalTitle: 'KRP Creation से बाहर निकलें?',
+    exitModalDesc: 'क्या आप वाकई एप्लिकेशन से बाहर निकलना चाहते हैं?',
+    exitStayBtn: 'ऐप में रहें',
+    exitLeaveBtn: 'बाहर निकलें',
   },
 };
 
@@ -347,9 +395,9 @@ function LastDayEventToast({
 
   const typeLabel =
     ev.type === 'live' ? '🎥 Live' :
-    ev.type === 'exhibition' ? '🎪 Exhibition' :
-    ev.type === 'product_launch' ? '🛍️ Launch' :
-    ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special';
+      ev.type === 'exhibition' ? '🎪 Exhibition' :
+        ev.type === 'product_launch' ? '🛍️ Launch' :
+          ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special';
 
   const progressPct = ((15 - secondsLeft) / 15) * 100;
 
@@ -418,6 +466,143 @@ function LastDayEventToast({
 }
 
 
+// ============================================================
+// OrderStatusTracker — Step-by-step progress timeline
+// ============================================================
+const ORDER_STEPS = [
+  { key: 'placed', labelKey: 'stepPlaced', icon: '📝', desc: 'Order placed & registered' },
+  { key: 'approved', labelKey: 'stepApproved', icon: '✓', desc: 'Payment verified by Admin' },
+  { key: 'packed', labelKey: 'stepPacked', icon: '📦', desc: 'Garment packed in warehouse' },
+  { key: 'shipped', labelKey: 'stepShipped', icon: '🚚', desc: 'Handed over to courier' },
+  { key: 'out_for_delivery', labelKey: 'stepOutDelivery', icon: '🛵', desc: 'Out with delivery agent' },
+  { key: 'delivered', labelKey: 'stepDelivered', icon: '🎉', desc: 'Package delivered safely' }
+];
+
+function OrderStatusTracker({
+  order,
+  isDark,
+  t
+}: {
+  order: Order;
+  isDark: boolean;
+  t: (k: string) => string;
+}) {
+  const isRejected = order.status === 'rejected';
+  const isCancelled = order.status === 'cancelled';
+  const isPendingVerification = order.status === 'payment_pending';
+  const isPendingSync = order.status === 'pending_sync';
+
+  // Determine current active step index (0 to 5)
+  let activeStepIdx = 0;
+  if (order.status === 'delivered') activeStepIdx = 5;
+  else if (order.status === 'out_for_delivery') activeStepIdx = 4;
+  else if (order.status === 'shipped') activeStepIdx = 3;
+  else if (order.status === 'packed') activeStepIdx = 2;
+  else if (order.status === 'approved' || order.status === 'synced') activeStepIdx = 1;
+  else activeStepIdx = 0; // payment_pending or pending_sync
+
+  if (isRejected || isCancelled) {
+    return (
+      <div className={`p-3.5 rounded-xl border flex items-center gap-3 ${
+        isRejected
+          ? (isDark ? 'bg-red-950/40 border-red-800 text-red-200' : 'bg-rose-50 border-rose-200 text-rose-800')
+          : (isDark ? 'bg-slate-700/60 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-300 text-slate-700')
+      }`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${
+          isRejected ? 'bg-rose-600 text-white' : 'bg-slate-500 text-white'
+        }`}>
+          {isRejected ? '✕' : '🚫'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold text-xs uppercase tracking-wider">
+            {isRejected ? t('stepRejected') : t('stepCancelled')}
+          </div>
+          <p className="text-[11px] opacity-80 mt-0.5">
+            {isRejected
+              ? (order.rejectionReason || 'Order was rejected by seller.')
+              : (order.cancellationReason || 'Order was cancelled.')}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-rose-100'}`}>
+      <div className="flex items-center justify-between mb-3 border-b pb-2 border-rose-100/50">
+        <span className="font-bold text-xs uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
+          <span>📍</span> {t('orderTracking')}
+        </span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
+          Step {Math.min(activeStepIdx + 1, 6)} of 6
+        </span>
+      </div>
+
+      {isPendingVerification && (
+        <div className="mb-3 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-2">
+          <span className="animate-spin text-sm">⏳</span>
+          <span><strong>{t('stepAwaitingApproval')}</strong> — Admin is confirming your payment deposit.</span>
+        </div>
+      )}
+
+      {isPendingSync && (
+        <div className="mb-3 p-2 rounded-lg bg-sky-50 border border-sky-200 text-[11px] text-sky-800 flex items-center gap-2">
+          <span>📶</span>
+          <span><strong>{t('stepPendingSync')}</strong> — Saved offline on your device, will sync when online.</span>
+        </div>
+      )}
+
+      {/* Steps Visual Progress Bar */}
+      <div className="grid grid-cols-6 gap-1 relative">
+        {ORDER_STEPS.map((step, idx) => {
+          const isDone = idx < activeStepIdx || (idx === activeStepIdx && order.status === 'delivered');
+          const isCurrent = idx === activeStepIdx && order.status !== 'delivered';
+          const isUpcoming = idx > activeStepIdx;
+
+          return (
+            <div key={step.key} className="flex flex-col items-center text-center relative group">
+              {/* Connector line behind */}
+              {idx < ORDER_STEPS.length - 1 && (
+                <div
+                  className={`absolute top-3.5 left-1/2 w-full h-1 -z-0 transition-all ${
+                    idx < activeStepIdx ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                  }`}
+                />
+              )}
+
+              {/* Step Circle */}
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all shadow-sm ${
+                  isDone
+                    ? 'bg-emerald-600 text-white shadow-emerald-500/30'
+                    : isCurrent
+                    ? 'bg-rose-600 text-white ring-4 ring-rose-200 animate-pulse'
+                    : 'bg-slate-100 text-slate-400 border border-slate-300 dark:bg-slate-700 dark:text-slate-400 dark:border-slate-600'
+                }`}
+              >
+                {isDone ? '✓' : step.icon}
+              </div>
+
+              {/* Label */}
+              <span
+                className={`text-[9px] font-bold mt-1.5 leading-tight ${
+                  isCurrent
+                    ? 'text-rose-600'
+                    : isDone
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : 'text-slate-400'
+                }`}
+              >
+                {t(step.labelKey)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
 
   const { user, login: setAuthSession, logout } = useAuth();
@@ -460,6 +645,7 @@ export default function App() {
   // Admin states for adding products
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
+  const [newProductStock, setNewProductStock] = useState('10');
   const [newProductDesc, setNewProductDesc] = useState('');
   const [newProductCategory, setNewProductCategory] = useState('Saree');
   const [newProductImage, setNewProductImage] = useState('');
@@ -605,11 +791,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
 
-  // Global UI States (Loader & Toast)
+  // Global UI States (Loader & Toast & Exit Confirmation)
   const [isLoading, setIsLoading] = useState(false);
   const [isCatalogSyncing, setIsCatalogSyncing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
 
   // Live Query from Dexie
   const products = useLiveQuery(() => db.products.toArray()) || [];
@@ -676,6 +863,23 @@ export default function App() {
     localStorage.setItem('app_lang', lang);
   }, [lang]);
 
+  // Intercept back button and swipe gestures to show exit confirmation popup
+  useEffect(() => {
+    // Push an initial dummy state into history so the first back action triggers popstate instead of exiting
+    window.history.pushState({ app: 'krp_creation' }, '');
+
+    const handlePopState = () => {
+      // Re-push history entry so the browser doesn't close on immediate subsequent back clicks
+      window.history.pushState({ app: 'krp_creation' }, '');
+      setIsExitConfirmOpen(true);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
 
   // Safeguard: Preselect first valid database category if selected one is removed or uninitialized
 
@@ -695,34 +899,53 @@ export default function App() {
     }
   }, [announcementsList]);
 
-  // Automatically mark events & exhibitions as completed / expired if their date has passed
+  // Nightly Cron Job: Runs exactly once per day after 12:01 AM to expire completed/past events
   useEffect(() => {
     if (!eventsList || eventsList.length === 0) return;
-    const todayStr = moment().format('YYYY-MM-DD');
 
-    const checkAndExpireEvents = async () => {
-      for (const ev of eventsList) {
-        const cutoffDate = ev.eventEndDate || ev.eventDate;
-        if (cutoffDate && cutoffDate < todayStr && !ev.isCompleted && !ev.isExpired) {
-          const updated: EventItem = {
-            ...ev,
-            isCompleted: true,
-            isExpired: true
-          };
-          await db.events.put(updated);
-          if (isOnline && isCloudConfigured()) {
-            try {
-              await syncEventToCloud(updated);
-            } catch (_) {
-              // Ignore cloud sync error while offline
+    const CRON_STORAGE_KEY = 'events_last_cron_check_date';
+
+    const runNightlyCronCheck = async () => {
+      const now = moment();
+      const todayDateStr = now.format('YYYY-MM-DD');
+      const lastRunDate = localStorage.getItem(CRON_STORAGE_KEY);
+
+      // Check if current time is past 12:01 AM (00:01:00)
+      const isPastMidnight1Minute = now.hours() > 0 || (now.hours() === 0 && now.minutes() >= 1);
+
+      // Ensure the cron runs only ONCE per day after 12:01 AM
+      if (isPastMidnight1Minute && lastRunDate !== todayDateStr) {
+        // Stamp execution immediately to prevent multiple runs
+        localStorage.setItem(CRON_STORAGE_KEY, todayDateStr);
+
+        for (const ev of eventsList) {
+          const cutoffDate = ev.eventEndDate || ev.eventDate;
+          if (cutoffDate && cutoffDate < todayDateStr && !ev.isCompleted && !ev.isExpired) {
+            const updated: EventItem = {
+              ...ev,
+              isCompleted: true,
+              isExpired: true
+            };
+            await db.events.put(updated);
+            if (isOnline && isCloudConfigured()) {
+              try {
+                await syncEventToCloud(updated);
+              } catch (_) {
+                // Cloud sync error handled silently
+              }
             }
+            console.log(`[Nightly Cron 12:01 AM] Event "${ev.title}" (Date: ${cutoffDate}) marked as completed/expired.`);
           }
-          console.log(`Event "${ev.title}" (Date: ${cutoffDate}) automatically marked as expired.`);
         }
       }
     };
 
-    checkAndExpireEvents();
+    // Run check on mount
+    runNightlyCronCheck();
+
+    // Schedule timer to check every 60 seconds so that when the clock passes 12:01 AM tonight, it triggers once
+    const cronInterval = setInterval(runNightlyCronCheck, 60000);
+    return () => clearInterval(cronInterval);
   }, [eventsList, isOnline]);
 
   // Pull catalog products and global configurations from cloud on mount or online status change
@@ -940,13 +1163,25 @@ export default function App() {
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload) => {
             console.log('Realtime order updated: ', payload);
             const item = payload.new;
+
+            // Resolve actual fulfillment status — cloud stores 'approved' for delivery stages
+            // but embeds the real stage in shipping_info.fulfillmentStatus or rejection_reason prefix
+            let resolvedStatus: string = item.status || 'synced';
+            let cleanRejectionReason: string | undefined = item.rejection_reason || undefined;
+            if (item.shipping_info?.fulfillmentStatus) {
+              resolvedStatus = item.shipping_info.fulfillmentStatus;
+            } else if (cleanRejectionReason?.startsWith('fulfillment:')) {
+              resolvedStatus = cleanRejectionReason.replace('fulfillment:', '');
+              cleanRejectionReason = undefined;
+            }
+
             // Find local order by receiptId and update it
             const localOrders = await db.orders.toArray();
             const existing = localOrders.find(o => o.receiptId === item.receipt_id);
             if (existing && existing.id !== undefined) {
               await db.orders.update(existing.id, {
-                status: item.status || 'synced',
-                rejectionReason: item.rejection_reason || undefined,
+                status: resolvedStatus as Order['status'],
+                rejectionReason: cleanRejectionReason,
                 cancellationReason: item.cancellation_reason || undefined,
               });
             } else if (!existing) {
@@ -957,8 +1192,8 @@ export default function App() {
                 totalAmount: item.total_amount,
                 shippingInfo: item.shipping_info,
                 summary: item.summary,
-                status: item.status || 'synced',
-                rejectionReason: item.rejection_reason || undefined,
+                status: (resolvedStatus as Order['status']) || 'synced',
+                rejectionReason: cleanRejectionReason,
                 cancellationReason: item.cancellation_reason || undefined,
                 createdAt: new Date(item.created_at).getTime()
               });
@@ -969,13 +1204,25 @@ export default function App() {
             const userIsAdmin = !!localUserPhone && ADMIN_PHONES_LIST.includes(localUserPhone);
             const isCustomerOrder = item.shipping_info?.phone === localUserPhone;
 
-            // Alert customer in real-time if their order has been rejected
-            if (isCustomerOrder && item.status === 'rejected') {
-              showToast(`⚠️ Order #${item.receipt_id} has been Rejected. Remarks: ${item.rejection_reason || 'No remarks note provided.'}`, 'error');
+            // Alert customer in real-time for all delivery lifecycle status changes
+            if (isCustomerOrder) {
+              if (resolvedStatus === 'approved') {
+                showToast(`✅ Order #${item.receipt_id} Payment has been Approved! Your receipt is ready.`, 'success');
+              } else if (resolvedStatus === 'packed') {
+                showToast(`📦 Order #${item.receipt_id} has been Packed & is Ready to Ship!`, 'info');
+              } else if (resolvedStatus === 'shipped') {
+                showToast(`🚚 Order #${item.receipt_id} has been Shipped! It's on the way.`, 'info');
+              } else if (resolvedStatus === 'out_for_delivery') {
+                showToast(`🛵 Order #${item.receipt_id} is Out for Delivery! Expect it soon.`, 'info');
+              } else if (resolvedStatus === 'delivered') {
+                showToast(`🎉 Order #${item.receipt_id} has been Delivered! Thank you for shopping with KRP Creation.`, 'success');
+              } else if (resolvedStatus === 'rejected') {
+                showToast(`⚠️ Order #${item.receipt_id} has been Rejected. Remarks: ${cleanRejectionReason || 'No remarks note provided.'}`, 'error');
+              }
             }
 
             // Alert admin in real-time if a customer cancelled an order
-            if (userIsAdmin && item.status === 'cancelled') {
+            if (userIsAdmin && resolvedStatus === 'cancelled') {
               showToast(`🚫 Order #${item.receipt_id} was Cancelled by Customer. Reason: ${item.cancellation_reason || 'No reason provided.'}`, 'info');
             }
           })
@@ -1403,7 +1650,7 @@ export default function App() {
         description: newProductDesc.trim(),
         imageUrl: newProductImage || '',
         category: newProductCategory,
-        stock: 10,
+        stock: parseInt(newProductStock, 10) >= 0 ? parseInt(newProductStock, 10) : 10,
         discount: 0,
         isFestiveDiscount: !!newProductFestival,
         festiveName: newProductFestival || undefined,
@@ -1426,6 +1673,7 @@ export default function App() {
       showToast('Product added successfully to catalog!', 'success');
       setNewProductName('');
       setNewProductPrice('');
+      setNewProductStock('10');
       setNewProductDesc('');
       setNewProductImage('');
       setNewProductDelivery('50');
@@ -1563,6 +1811,30 @@ export default function App() {
       showToast('Failed to approve order.', 'error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Admin Update Order Lifecycle Status (packed, shipped, out_for_delivery, delivered, etc.)
+  const handleUpdateOrderStatus = async (orderId: number, newStatus: Order['status']) => {
+    try {
+      // 1. Update local Dexie immediately — this triggers instant reactive UI via useLiveQuery
+      await db.orders.update(orderId, { status: newStatus });
+
+      // 2. Show instant feedback
+      const statusLabel = newStatus.replace(/_/g, ' ').toUpperCase();
+      showToast(`✅ Order status → ${statusLabel}`, 'success');
+
+      // 3. Cloud sync in background (non-blocking)
+      if (isOnline && isCloudConfigured()) {
+        const orderObj = await db.orders.get(orderId);
+        if (orderObj) {
+          syncOrdersToCloud([orderObj]).catch((err) => {
+            console.warn('Cloud sync after status update failed (will retry next sync):', err);
+          });
+        }
+      }
+    } catch (err) {
+      showToast('Failed to update order status.', 'error');
     }
   };
 
@@ -1832,7 +2104,7 @@ export default function App() {
       if (isOnline && isCloudConfigured()) {
         try {
           await syncEventToCloud(updated);
-        } catch (_) {}
+        } catch (_) { }
       }
       showToast(`Event marked as ${newStatus ? 'Completed / Expired' : 'Active'}!`, 'success');
     } catch (err) {
@@ -2317,12 +2589,10 @@ export default function App() {
 
       {/* Toast Alert Notification */}
       {toast && (
-        <div className={`fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[9998] max-w-sm w-auto sm:w-full border rounded-xl shadow-2xl p-3 sm:p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden ${
-          isDark ? 'bg-slate-800 border-slate-700 text-slate-100 shadow-black/50' : 'bg-white border-rose-100 text-slate-800'
-        }`}>
-          <span className={`w-3 h-3 rounded-full shrink-0 ${
-            toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
-          }`} />
+        <div className={`fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[9998] max-w-sm w-auto sm:w-full border rounded-xl shadow-2xl p-3 sm:p-4 flex items-center gap-3 animate-in slide-in-from-top-10 duration-200 print:hidden ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100 shadow-black/50' : 'bg-white border-rose-100 text-slate-800'
+          }`}>
+          <span className={`w-3 h-3 rounded-full shrink-0 ${toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'error' ? 'bg-rose-500' : 'bg-amber-500'
+            }`} />
           <div className={`text-xs sm:text-sm font-medium flex-1 ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{toast.message}</div>
           <button onClick={() => setToast(null)} className={`ml-auto font-bold shrink-0 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-600'}`}>✕</button>
         </div>
@@ -2331,9 +2601,8 @@ export default function App() {
       {/* Fullscreen Loader Overlay */}
       {isLoading && (
         <div className="fixed inset-0 z-55 flex flex-col items-center justify-center bg-slate-955/40 backdrop-blur-[2px] print:hidden">
-          <div className={`p-6 rounded-2xl shadow-2xl border flex flex-col items-center gap-3 ${
-            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-50'
-          }`}>
+          <div className={`p-6 rounded-2xl shadow-2xl border flex flex-col items-center gap-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-rose-50'
+            }`}>
             <span className="w-10 h-10 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" />
             <span className="text-xs font-bold text-rose-500 tracking-wider uppercase animate-pulse">Processing...</span>
           </div>
@@ -2382,11 +2651,10 @@ export default function App() {
                 key={l}
                 onClick={() => setLang(l)}
                 title={l === 'en' ? 'English' : l === 'bn' ? 'বাংলা' : 'हिन्दी'}
-                className={`px-1.5 sm:px-2 py-1 transition-all cursor-pointer ${
-                  lang === l
-                    ? 'bg-rose-600 text-white'
-                    : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-rose-50'
-                }`}
+                className={`px-1.5 sm:px-2 py-1 transition-all cursor-pointer ${lang === l
+                  ? 'bg-rose-600 text-white'
+                  : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-rose-50'
+                  }`}
               >
                 {l === 'en' ? 'EN' : l === 'bn' ? 'বাং' : 'हि'}
               </button>
@@ -2497,36 +2765,32 @@ export default function App() {
 
             {/* Big Notice Floating Pinned Card */}
             {announcementsList.length > 0 && announcementsList[0].bigNotice && showBigNotice && (
-              <div className={`fixed bottom-4 right-4 z-50 p-4 max-w-sm w-[calc(100vw-2rem)] border-2 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-300 print:hidden ${
-                isDark
-                  ? 'bg-slate-800/95 border-amber-500/40 text-slate-100 backdrop-blur-md'
-                  : 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 text-slate-800'
-              }`}>
+              <div className={`fixed bottom-4 right-4 z-50 p-4 max-w-sm w-[calc(100vw-2rem)] border-2 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-300 print:hidden ${isDark
+                ? 'bg-slate-800/95 border-amber-500/40 text-slate-100 backdrop-blur-md'
+                : 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 text-slate-800'
+                }`}>
                 <div className="absolute top-0 right-0 w-16 h-16 bg-amber-400/10 rounded-full blur-xl pointer-events-none" />
 
                 <button
                   onClick={() => setShowBigNotice(false)}
-                  className={`absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-all border ${
-                    isDark
-                      ? 'bg-slate-700 hover:bg-slate-600 text-amber-400 border-slate-600'
-                      : 'bg-amber-100/80 hover:bg-amber-200 text-amber-800 border-amber-200/50'
-                  }`}
+                  className={`absolute top-2.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-all border ${isDark
+                    ? 'bg-slate-700 hover:bg-slate-600 text-amber-400 border-slate-600'
+                    : 'bg-amber-100/80 hover:bg-amber-200 text-amber-800 border-amber-200/50'
+                    }`}
                   title="Close Notice"
                 >
                   ✕
                 </button>
 
-                <div className={`flex items-center gap-2 border-b pb-2 mb-2 ${
-                  isDark ? 'text-amber-400 border-slate-700' : 'text-amber-900 border-amber-200/50'
-                }`}>
+                <div className={`flex items-center gap-2 border-b pb-2 mb-2 ${isDark ? 'text-amber-400 border-slate-700' : 'text-amber-900 border-amber-200/50'
+                  }`}>
                   <span className="text-base animate-bounce">📌</span>
                   <h3 className="font-extrabold text-xs uppercase tracking-wider font-serif">Our Notice/Announcement</h3>
                 </div>
 
                 <div className="max-h-36 overflow-y-auto pr-1">
-                  <p className={`text-[11px] sm:text-xs font-bold leading-relaxed whitespace-pre-wrap ${
-                    isDark ? 'text-slate-200' : 'text-slate-800'
-                  }`}>
+                  <p className={`text-[11px] sm:text-xs font-bold leading-relaxed whitespace-pre-wrap ${isDark ? 'text-slate-200' : 'text-slate-800'
+                    }`}>
                     {announcementsList[0].bigNotice}
                   </p>
                 </div>
@@ -2635,76 +2899,61 @@ export default function App() {
               </div>
             </div>
 
-            {/* Upcoming Events / Exhibitions Timeline Scheduler View */}
-            {eventsList.length > 0 && (
-              <div className="bg-white border border-rose-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-                <div className="text-center space-y-2 max-w-xl mx-auto">
-                  <h2 className="text-2xl font-bold tracking-tight text-slate-800 font-serif">Events & Exhibitions</h2>
-                  <p className="text-xs text-slate-450">Join our upcoming product launches, boutique pop-ups, and live event displays.</p>
-                </div>
-                <div className="relative border-l border-rose-150 ml-4 pl-6 space-y-8 py-3">
-                  {eventsList.map((ev) => {
-                    const isPast = ev.isCompleted || ev.isExpired;
-                    const lastDateStr = ev.eventEndDate || ev.eventDate;
-                    return (
-                      <div key={ev.id} className="relative group">
-                        {/* Timeline dot */}
-                        <span className={`absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border border-white shadow-sm ring-4 ${
-                          isPast ? 'bg-slate-400 ring-slate-100' : 'bg-rose-600 ring-rose-50'
-                        }`} />
-                        <div className={`border p-5 rounded-2xl transition-all shadow-sm space-y-2 ${
-                          isPast
-                            ? 'bg-slate-50/70 border-slate-200/70 opacity-75'
-                            : 'bg-rose-50/20 hover:bg-rose-50/40 border-rose-100/50'
-                        }`}>
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-50/80 pb-2">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded tracking-wider ${
-                                isPast
-                                  ? 'bg-slate-200 text-slate-700'
-                                  : 'bg-rose-100 text-rose-700'
-                              }`}>
-                                {ev.type === 'live' ? '🎥 Live Show' : ev.type === 'exhibition' ? '🎪 Exhibition Pop-Up' : ev.type === 'product_launch' ? '🛍️ Product Launch' : ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special Event'}
+            {/* Upcoming Events / Exhibitions Timeline Scheduler View (Only active, non-expired/non-completed on Home) */}
+            {(() => {
+              const activeHomeEvents = eventsList.filter((ev) => !ev.isCompleted && !ev.isExpired);
+              if (activeHomeEvents.length === 0) return null;
+
+              return (
+                <div className="bg-white border border-rose-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+                  <div className="text-center space-y-2 max-w-xl mx-auto">
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-800 font-serif">Events & Exhibitions</h2>
+                    <p className="text-xs text-slate-450">Join our upcoming product launches, boutique pop-ups, and live event displays.</p>
+                  </div>
+                  <div className="relative border-l border-rose-150 ml-4 pl-6 space-y-8 py-3">
+                    {activeHomeEvents.map((ev) => {
+                      const lastDateStr = ev.eventEndDate || ev.eventDate;
+                      return (
+                        <div key={ev.id} className="relative group">
+                          {/* Timeline dot */}
+                          <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border border-white shadow-sm ring-4 bg-rose-600 ring-rose-50" />
+                          <div className="border p-5 rounded-2xl transition-all shadow-sm space-y-2 bg-rose-50/20 hover:bg-rose-50/40 border-rose-100/50">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-50/80 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded tracking-wider bg-rose-100 text-rose-700">
+                                  {ev.type === 'live' ? '🎥 Live Show' : ev.type === 'exhibition' ? '🎪 Exhibition Pop-Up' : ev.type === 'product_launch' ? '🛍️ Product Launch' : ev.type === 'biggest_offer' ? '🔥 Biggest Offer' : '✨ Special Event'}
+                                </span>
+                                <h4 className="font-bold text-sm sm:text-base text-slate-800">{ev.title}</h4>
+                              </div>
+                              <span className="text-xs font-semibold rounded-lg px-2.5 py-1 shrink-0 border text-rose-600 bg-rose-50 border-rose-100">
+                                📅 {moment(ev.eventDate).format('D MMM YYYY')}
+                                {ev.eventEndDate && ` - ${moment(ev.eventEndDate).format('D MMM YYYY')}`}
+                                {ev.eventEndDate && (
+                                  <span className="ml-1.5 font-bold text-[10px] text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded">
+                                    Last Date: {moment(lastDateStr).format('D MMM')}
+                                  </span>
+                                )}
                               </span>
-                              {isPast && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                                  ✓ Completed / Expired
-                                </span>
-                              )}
-                              <h4 className="font-bold text-sm sm:text-base text-slate-800">{ev.title}</h4>
                             </div>
-                            <span className={`text-xs font-semibold rounded-lg px-2.5 py-1 shrink-0 border ${
-                              isPast
-                                ? 'text-slate-500 bg-slate-100 border-slate-200'
-                                : 'text-rose-600 bg-rose-50 border-rose-100'
-                            }`}>
-                              📅 {moment(ev.eventDate).format('D MMM YYYY')}
-                              {ev.eventEndDate && ` - ${moment(ev.eventEndDate).format('D MMM YYYY')}`}
-                              {ev.eventEndDate && (
-                                <span className="ml-1.5 font-bold text-[10px] text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded">
-                                  Last Date: {moment(lastDateStr).format('D MMM')}
-                                </span>
-                              )}
-                            </span>
+                            <p className="text-xs text-slate-550 leading-relaxed">{ev.description}</p>
+                            {ev.linkUrl && (
+                              <a
+                                href={ev.linkUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-xs font-bold text-rose-700 hover:text-rose-800 mt-2 hover:underline"
+                              >
+                                Find details & join stream ➜
+                              </a>
+                            )}
                           </div>
-                          <p className="text-xs text-slate-550 leading-relaxed">{ev.description}</p>
-                          {ev.linkUrl && !isPast && (
-                            <a
-                              href={ev.linkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-xs font-bold text-rose-700 hover:text-rose-800 mt-2 hover:underline"
-                            >
-                              Find details & join stream ➜
-                            </a>
-                          )}
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Fabric Spotlight block */}
             <div className="bg-rose-50/40 border border-rose-100 p-6 sm:p-8 rounded-3xl text-center max-w-3xl mx-auto space-y-4">
@@ -3267,8 +3516,8 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        {/* View Receipt: only after admin approval */}
-                        {(order.status === 'approved') && (
+                        {/* View Receipt: available once payment is approved or subsequent delivery stages */}
+                        {(order.status === 'approved' || order.status === 'packed' || order.status === 'shipped' || order.status === 'out_for_delivery' || order.status === 'delivered') && (
                           <button
                             onClick={() => setActiveReceiptOrder(order)}
                             className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-emerald-200 transition-colors"
@@ -3285,8 +3534,8 @@ export default function App() {
                             💬 Send Details via WhatsApp
                           </button>
                         )}
-                        {/* Cancel button: only for approved/synced orders not yet cancelled/rejected */}
-                        {(order.status === 'approved' || order.status === 'synced' || order.status === 'pending_sync') && (
+                        {/* Cancel button: only for orders not yet shipped/delivered/rejected/cancelled */}
+                        {(order.status === 'approved' || order.status === 'synced' || order.status === 'pending_sync' || order.status === 'packed') && (
                           <button
                             onClick={() => setCancellingOrderId(order.id!)}
                             className="bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs px-3.5 py-1.5 rounded-lg border border-slate-200 transition-colors"
@@ -3297,24 +3546,36 @@ export default function App() {
                         <span
                           className={`text-xs px-3.5 py-1 rounded-full font-bold border ${order.status === 'approved'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : order.status === 'synced'
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : order.status === 'rejected'
-                                ? 'bg-rose-50 text-rose-750 border-rose-200'
-                                : order.status === 'cancelled'
-                                  ? 'bg-slate-100 text-slate-600 border-slate-300'
-                                  : order.status === 'payment_pending'
-                                    ? 'bg-amber-50 text-amber-700 border-amber-300'
-                                    : 'bg-sky-50 text-sky-700 border-sky-200'
+                            : order.status === 'packed'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : order.status === 'shipped'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : order.status === 'out_for_delivery'
+                                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                  : order.status === 'delivered'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : order.status === 'synced'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : order.status === 'rejected'
+                                        ? 'bg-rose-50 text-rose-750 border-rose-200'
+                                        : order.status === 'cancelled'
+                                          ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                          : order.status === 'payment_pending'
+                                            ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                            : 'bg-sky-50 text-sky-700 border-sky-200'
                             }`}
                         >
                           {
                             order.status === 'approved' ? '✓ Payment Approved' :
-                              order.status === 'synced' ? 'Placed Online' :
-                                order.status === 'rejected' ? 'Rejected' :
-                                  order.status === 'cancelled' ? 'Cancelled' :
-                                    order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
-                                      'Queued Offline'
+                              order.status === 'packed' ? '📦 Packed & Ready' :
+                                order.status === 'shipped' ? '🚚 Shipped' :
+                                  order.status === 'out_for_delivery' ? '🛵 Out for Delivery' :
+                                    order.status === 'delivered' ? '🎉 Delivered' :
+                                      order.status === 'synced' ? 'Placed Online' :
+                                        order.status === 'rejected' ? 'Rejected' :
+                                          order.status === 'cancelled' ? 'Cancelled' :
+                                            order.status === 'payment_pending' ? '⏳ Awaiting Approval' :
+                                              'Queued Offline'
                           }
                         </span>
                       </div>
@@ -3387,6 +3648,11 @@ export default function App() {
                           <strong>🚫 Cancellation Reason:</strong> {order.cancellationReason || 'No reason provided.'}
                         </div>
                       )}
+                    </div>
+
+                    {/* Step-by-Step Order Delivery Progress Tracker */}
+                    <div className="pt-2">
+                      <OrderStatusTracker order={order} isDark={isDark} t={t} />
                     </div>
                   </div>
                 ))}
@@ -3666,11 +3932,10 @@ export default function App() {
                     <button
                       key={tab.key}
                       onClick={() => setAdminActiveTab(tab.key as typeof adminActiveTab)}
-                      className={`whitespace-nowrap px-3 py-2 text-xs font-bold rounded-xl transition-all shrink-0 flex items-center gap-1.5 ${
-                        adminActiveTab === tab.key
-                          ? 'bg-rose-600 text-white shadow-md'
-                          : isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600' : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
-                      }`}
+                      className={`whitespace-nowrap px-3 py-2 text-xs font-bold rounded-xl transition-all shrink-0 flex items-center gap-1.5 ${adminActiveTab === tab.key
+                        ? 'bg-rose-600 text-white shadow-md'
+                        : isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600' : 'bg-white hover:bg-rose-50 text-slate-600 border border-rose-100'
+                        }`}
                     >
                       {tab.label}
                       {tab.badge ? <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">{tab.badge}</span> : null}
@@ -3820,9 +4085,9 @@ export default function App() {
                                 className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none"
                               />
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="block text-slate-600 mb-1">Price (₹)</label>
+                                <label className="block text-slate-600 mb-1">Price (₹) *</label>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -3834,7 +4099,21 @@ export default function App() {
                                 />
                               </div>
                               <div>
-                                <label className="block text-slate-600 mb-1">Del Charge (₹)</label>
+                                <label className="block text-slate-600 mb-1">Stock *</label>
+                                <input
+                                  type="number"
+                                  required
+                                  min="0"
+                                  value={newProductStock}
+                                  onChange={(e) => setNewProductStock(e.target.value)}
+                                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-2 focus:border-rose-400 focus:outline-none font-bold text-slate-800"
+                                  placeholder="e.g. 10"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-slate-600 mb-1">Delivery Charge (₹)</label>
                                 <input
                                   type="number"
                                   required
@@ -4211,14 +4490,36 @@ export default function App() {
                         <p className="text-slate-405 text-sm">No orders registered on this device.</p>
                       ) : (
                         <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                          {allOrders.map((order) => (
+                          {/* Sort: unread (new) orders first, then newest by date */}
+                          {[...allOrders]
+                            .sort((a, b) => {
+                              const aIsNew = !readOrderIds.includes(String(a.id));
+                              const bIsNew = !readOrderIds.includes(String(b.id));
+                              if (aIsNew && !bIsNew) return -1;
+                              if (!aIsNew && bIsNew) return 1;
+                              return b.createdAt - a.createdAt;
+                            })
+                            .map((order) => {
+                            const isNewOrder = !readOrderIds.includes(String(order.id));
+                            return (
                             <div
                               key={order.id}
-                              className={`p-4 rounded-2xl flex flex-col gap-3 text-sm shadow-sm relative border ${!readOrderIds.includes(String(order.id))
-                                ? 'border-rose-300 bg-rose-50/50 shadow-md shadow-rose-100/50 ring-1 ring-rose-200'
-                                : 'border-rose-100 bg-rose-50/30'
-                                }`}
+                              className={`rounded-2xl flex flex-col gap-3 text-sm shadow-sm relative border transition-all ${
+                                isNewOrder
+                                  ? 'border-rose-400 bg-rose-50/70 shadow-lg shadow-rose-200/60 ring-2 ring-rose-300'
+                                  : 'border-rose-100 bg-rose-50/30 p-4'
+                              }`}
                             >
+                              {/* 🆕 NEW ORDER Banner */}
+                              {isNewOrder && (
+                                <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-rose-600 to-pink-600 text-white text-[11px] font-bold px-4 py-2 rounded-t-2xl">
+                                  <span className="flex items-center gap-1.5 animate-pulse">
+                                    <span className="text-sm">🆕</span> NEW ORDER RECEIVED
+                                  </span>
+                                  <span className="opacity-80 font-normal text-[10px]">{moment(order.createdAt).fromNow()}</span>
+                                </div>
+                              )}
+                              <div className={`flex flex-col gap-3 ${isNewOrder ? 'p-4' : ''}`}>
                               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start border-b border-rose-100/50 pb-2 gap-2">
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                                   <span className="font-bold text-slate-800 font-mono text-xs sm:text-sm">Order #{order.receiptId || `KRP-${order.id}`}</span>
@@ -4381,8 +4682,72 @@ export default function App() {
                                 <span>{order.items.reduce((acc, i) => acc + i.quantity, 0)} items purchased</span>
                                 <span>Total: <strong className="font-bold text-rose-600 text-sm">₹{order.totalAmount.toFixed(2)}</strong></span>
                               </div>
+
+                              {/* Admin Live Lifecycle Tracker & Status Advance Controls */}
+                              <div className="border-t border-rose-100/60 pt-3 space-y-2.5">
+                                <OrderStatusTracker order={order} isDark={isDark} t={t} />
+
+                                {order.status !== 'rejected' && order.status !== 'cancelled' && (
+                                  <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-rose-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
+                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                      <span>⚙️</span> {t('updateStatusBtn')}:
+                                    </span>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        disabled={isLoading || order.status === 'packed'}
+                                        onClick={() => handleUpdateOrderStatus(order.id!, 'packed')}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                          order.status === 'packed'
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                                        }`}
+                                      >
+                                        📦 {t('stepPacked')}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isLoading || order.status === 'shipped'}
+                                        onClick={() => handleUpdateOrderStatus(order.id!, 'shipped')}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                          order.status === 'shipped'
+                                            ? 'bg-purple-600 text-white border-purple-600'
+                                            : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200'
+                                        }`}
+                                      >
+                                        🚚 {t('stepShipped')}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isLoading || order.status === 'out_for_delivery'}
+                                        onClick={() => handleUpdateOrderStatus(order.id!, 'out_for_delivery')}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                          order.status === 'out_for_delivery'
+                                            ? 'bg-orange-600 text-white border-orange-600'
+                                            : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
+                                        }`}
+                                      >
+                                        🛵 {t('stepOutDelivery')}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isLoading || order.status === 'delivered'}
+                                        onClick={() => handleUpdateOrderStatus(order.id!, 'delivered')}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                          order.status === 'delivered'
+                                            ? 'bg-emerald-600 text-white border-emerald-600'
+                                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                        }`}
+                                      >
+                                        🎉 {t('stepDelivered')}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          ))}
+                            </div>
+                          );})}
                         </div>
                       )}
                     </div>
@@ -4551,17 +4916,15 @@ export default function App() {
                                 return (
                                   <div
                                     key={ev.id}
-                                    className={`p-4 rounded-xl flex items-start justify-between gap-4 text-xs shadow-inner border ${
-                                      isPast
-                                        ? 'bg-slate-50 border-slate-200 opacity-80'
-                                        : 'bg-rose-50/20 border-rose-100/60'
-                                    }`}
+                                    className={`p-4 rounded-xl flex items-start justify-between gap-4 text-xs shadow-inner border ${isPast
+                                      ? 'bg-slate-50 border-slate-200 opacity-80'
+                                      : 'bg-rose-50/20 border-rose-100/60'
+                                      }`}
                                   >
                                     <div>
                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className={`inline-block text-[9px] uppercase font-bold px-2 py-0.5 rounded tracking-wider ${
-                                          isPast ? 'bg-slate-200 text-slate-700' : 'bg-rose-100 text-rose-700'
-                                        }`}>
+                                        <span className={`inline-block text-[9px] uppercase font-bold px-2 py-0.5 rounded tracking-wider ${isPast ? 'bg-slate-200 text-slate-700' : 'bg-rose-100 text-rose-700'
+                                          }`}>
                                           {ev.type}
                                         </span>
                                         {isPast ? (
@@ -4583,11 +4946,10 @@ export default function App() {
                                     <div className="flex flex-col gap-1.5 shrink-0">
                                       <button
                                         onClick={() => handleToggleEventCompleted(ev)}
-                                        className={`px-2 py-1 rounded font-semibold text-center text-[10px] border transition-colors ${
-                                          isPast
-                                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                                        }`}
+                                        className={`px-2 py-1 rounded font-semibold text-center text-[10px] border transition-colors ${isPast
+                                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                          }`}
                                       >
                                         {isPast ? 'Mark Active' : 'Mark Completed'}
                                       </button>
@@ -5134,124 +5496,124 @@ export default function App() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm print:hidden animate-in fade-in duration-200">
           <div className={`border w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[92vh] ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-rose-100 text-slate-800'}`}>
             <div className="overflow-y-auto p-4">
-            <button
-              onClick={() => setIsCheckoutOpen(false)}
-              className="absolute top-2.5 right-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 w-6 h-6 rounded-full flex items-center justify-center font-bold transition-colors border border-rose-100 text-xs"
-            >
-              ✕
-            </button>
-            <h3 className="text-base font-bold text-slate-800 mb-0.5 border-b border-rose-55 pb-1 font-serif">Delivery Information</h3>
-            <p className="text-[10px] text-slate-500 mb-3">All fields are mandatory for shipping.</p>
+              <button
+                onClick={() => setIsCheckoutOpen(false)}
+                className="absolute top-2.5 right-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 w-6 h-6 rounded-full flex items-center justify-center font-bold transition-colors border border-rose-100 text-xs"
+              >
+                ✕
+              </button>
+              <h3 className="text-base font-bold text-slate-800 mb-0.5 border-b border-rose-55 pb-1 font-serif">Delivery Information</h3>
+              <p className="text-[10px] text-slate-500 mb-3">All fields are mandatory for shipping.</p>
 
-            <form onSubmit={handleShippingSubmit} className="space-y-2 text-xs">
-              <div className="grid grid-cols-2 gap-2">
+              <form onSubmit={handleShippingSubmit} className="space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Receiver's Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={shipName}
+                      onChange={(e) => setShipName(e.target.value)}
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-450 focus:outline-none text-slate-850"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Contact Phone *</label>
+                    <input
+                      type="tel"
+                      required
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      value={shipPhone}
+                      onChange={(e) => setShipPhone(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850"
+                    />
+                  </div>
+                </div>
+
+                {/* Grid: Country, State, City */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Country *</label>
+                    <select
+                      required
+                      value={shipCountry}
+                      onChange={(e) => setShipCountry(e.target.value)}
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 text-[11px]"
+                    >
+                      <option value="">Country</option>
+                      {countries.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">State *</label>
+                    <select
+                      required
+                      disabled={!shipCountry}
+                      value={shipState}
+                      onChange={(e) => setShipState(e.target.value)}
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
+                    >
+                      <option value="">State</option>
+                      {states.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">City *</label>
+                    <select
+                      required
+                      disabled={!shipState}
+                      value={shipCity}
+                      onChange={(e) => setShipCity(e.target.value)}
+                      className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
+                    >
+                      <option value="">City</option>
+                      {cities.map((ci) => (
+                        <option key={ci} value={ci}>{ci}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Receiver's Name *</label>
-                  <input
-                    type="text"
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Street Address *</label>
+                  <textarea
                     required
-                    value={shipName}
-                    onChange={(e) => setShipName(e.target.value)}
-                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-450 focus:outline-none text-slate-850"
+                    placeholder="Flat No, Building, Street Name..."
+                    value={shipAddress}
+                    onChange={(e) => setShipAddress(e.target.value)}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none h-12 resize-none text-slate-850"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Contact Phone *</label>
+                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Pincode / ZIP * </label>
                   <input
                     type="tel"
                     required
                     pattern="[0-9]*"
                     inputMode="numeric"
-                    value={shipPhone}
-                    onChange={(e) => setShipPhone(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850"
+                    maxLength={6}
+                    placeholder="6-digit Pincode"
+                    value={shipPincode}
+                    onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-450 focus:outline-none text-slate-850"
                   />
                 </div>
-              </div>
 
-              {/* Grid: Country, State, City */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Country *</label>
-                  <select
-                    required
-                    value={shipCountry}
-                    onChange={(e) => setShipCountry(e.target.value)}
-                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 text-[11px]"
-                  >
-                    <option value="">Country</option>
-                    {countries.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">State *</label>
-                  <select
-                    required
-                    disabled={!shipCountry}
-                    value={shipState}
-                    onChange={(e) => setShipState(e.target.value)}
-                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
-                  >
-                    <option value="">State</option>
-                    {states.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">City *</label>
-                  <select
-                    required
-                    disabled={!shipState}
-                    value={shipCity}
-                    onChange={(e) => setShipCity(e.target.value)}
-                    className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none text-slate-850 disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
-                  >
-                    <option value="">City</option>
-                    {cities.map((ci) => (
-                      <option key={ci} value={ci}>{ci}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Street Address *</label>
-                <textarea
-                  required
-                  placeholder="Flat No, Building, Street Name..."
-                  value={shipAddress}
-                  onChange={(e) => setShipAddress(e.target.value)}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-455 focus:outline-none h-12 resize-none text-slate-850"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-655 mb-0.5">Pincode / ZIP * </label>
-                <input
-                  type="tel"
-                  required
-                  pattern="[0-9]*"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="6-digit Pincode"
-                  value={shipPincode}
-                  onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-rose-50/20 border border-rose-100 rounded-lg p-1.5 focus:border-rose-450 focus:outline-none text-slate-850"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-1.5 rounded-lg transition-colors shadow-md mt-2 text-xs"
-              >
-                Proceed to Payment
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="w-full bg-rose-600 hover:bg-rose-550 text-white font-bold py-1.5 rounded-lg transition-colors shadow-md mt-2 text-xs"
+                >
+                  Proceed to Payment
+                </button>
+              </form>
             </div>{/* /scrollable wrapper */}
           </div>
         </div>
@@ -6625,8 +6987,9 @@ export default function App() {
         if (!lastDayToastVisible) return null;
         const today = moment().startOf('day');
 
-        // Only show events whose last date == today (ignore expired/completed — today is NOT past)
+        // Only show events whose last date == today and are not marked completed or expired
         const lastDayEvents = eventsList.filter((ev) => {
+          if (ev.isCompleted || ev.isExpired) return false;
           if (dismissedLastDayEventIds.includes(String(ev.id))) return false;
           const lastDateRaw = (ev.eventEndDate || ev.eventDate || '').trim();
           if (!lastDateRaw) return false;
@@ -6644,7 +7007,7 @@ export default function App() {
         const handleDismiss = () => {
           const updated = [...dismissedLastDayEventIds, String(ev.id)];
           setDismissedLastDayEventIds(updated);
-          try { sessionStorage.setItem('dismissed_last_day_event_ids', JSON.stringify(updated)); } catch {}
+          try { sessionStorage.setItem('dismissed_last_day_event_ids', JSON.stringify(updated)); } catch { }
           if (updated.length >= lastDayEvents.length) {
             setLastDayToastVisible(false);
           } else {
@@ -6666,6 +7029,69 @@ export default function App() {
           />
         );
       })()}
+
+      {/* Exit App Confirmation Popup (Triggered on Back Button / Swipe) */}
+      {isExitConfirmOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm print:hidden animate-in fade-in duration-200">
+          <div className={`border w-full max-w-sm rounded-2xl p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200 text-center ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-rose-100 text-slate-800'
+            }`}>
+            {/* Top Close 'X' Button */}
+            <button
+              onClick={() => setIsExitConfirmOpen(false)}
+              className={`absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs transition-colors border ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600' : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-100'
+                }`}
+              title={t('close')}
+            >
+              ✕
+            </button>
+
+            {/* Exit Icon badge */}
+            <div className="w-14 h-14 rounded-full bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-200 dark:border-rose-900/50 flex items-center justify-center mx-auto mb-3 text-2xl shadow-sm">
+              🚪
+            </div>
+
+            <h3 className="text-lg font-bold font-serif mb-1.5">
+              {t('exitModalTitle')}
+            </h3>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+              {t('exitModalDesc')}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExitConfirmOpen(false)}
+                className={`flex-1 font-bold py-2.5 rounded-xl text-xs transition-all border ${isDark
+                  ? 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                  }`}
+              >
+                {t('exitStayBtn')}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExitConfirmOpen(false);
+                  // Attempt native window close if supported, or navigate back in history
+                  try {
+                    window.close();
+                  } catch { }
+                  // If window.close() is blocked by browser security (scripts can only close windows opened by scripts),
+                  // navigate back through history
+                  setTimeout(() => {
+                    window.history.go(-2);
+                  }, 100);
+                }}
+                className="flex-1 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95"
+              >
+                {t('exitLeaveBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

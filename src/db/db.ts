@@ -61,9 +61,10 @@ export interface Order {
     selectedVariant?: ColorVariant; // Color variant selected at purchase
   }[];
   totalAmount: number;
-  status: 'payment_pending' | 'pending_sync' | 'synced' | 'approved' | 'rejected' | 'cancelled';
+  status: 'payment_pending' | 'pending_sync' | 'synced' | 'approved' | 'packed' | 'shipped' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled';
   rejectionReason?: string;
   cancellationReason?: string;
+  trackingUpdates?: Array<{ status: string; title: string; timestamp: number; note?: string }>;
   shippingInfo: {
     fullName: string;
     phone: string;

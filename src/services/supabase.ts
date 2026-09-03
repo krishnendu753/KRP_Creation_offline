@@ -125,17 +125,33 @@ export const syncOrdersToCloud = async (orders: Order[]) => {
   const supabase = getSupabaseClient();
   if (!supabase) return;
 
-  const formatted = orders.map(order => ({
-    receipt_id: order.receiptId,
-    items: order.items,
-    total_amount: order.totalAmount,
-    shipping_info: order.shippingInfo,
-    summary: order.summary,
-    status: order.status,
-    rejection_reason: order.rejectionReason || null,
-    cancellation_reason: order.cancellationReason || null,
-    created_at: new Date(order.createdAt).toISOString()
-  }));
+  const formatted = orders.map(order => {
+    // Cloud Supabase "orders" table has a check constraint (check_status) on the status column.
+    // Map fulfillment lifecycle statuses ('packed', 'shipped', 'out_for_delivery', 'delivered')
+    // safely to 'approved' for the cloud status column if older constraint is in place,
+    // and encode the specific fulfillment stage into tracking_info/rejection_reason or sync safely.
+    let cloudStatus: string = order.status;
+    if (['packed', 'shipped', 'out_for_delivery', 'delivered'].includes(order.status)) {
+      // If the Supabase database constraint check_status only permits ('payment_pending', 'pending_sync', 'synced', 'approved', 'rejected', 'cancelled')
+      // we send 'approved' to satisfy the constraint without error.
+      cloudStatus = 'approved';
+    }
+
+    return {
+      receipt_id: order.receiptId,
+      items: order.items,
+      total_amount: order.totalAmount,
+      shipping_info: {
+        ...order.shippingInfo,
+        fulfillmentStatus: order.status
+      },
+      summary: order.summary,
+      status: cloudStatus,
+      rejection_reason: order.rejectionReason || (order.status !== cloudStatus ? `fulfillment:${order.status}` : null),
+      cancellation_reason: order.cancellationReason || null,
+      created_at: new Date(order.createdAt).toISOString()
+    };
+  });
 
   const { error } = await supabase
     .from('orders')
@@ -168,14 +184,24 @@ export const pullOrdersFromCloud = async (): Promise<number> => {
 
     for (const item of data) {
       const cloudReceiptId = item.receipt_id;
+      // Recover specific fulfillment status if saved in shipping_info or rejection_reason prefix
+      let resolvedStatus = item.status || 'synced';
+      let cleanRejectionReason = item.rejection_reason || undefined;
+      if (item.shipping_info?.fulfillmentStatus) {
+        resolvedStatus = item.shipping_info.fulfillmentStatus;
+      } else if (cleanRejectionReason?.startsWith('fulfillment:')) {
+        resolvedStatus = cleanRejectionReason.replace('fulfillment:', '');
+        cleanRejectionReason = undefined;
+      }
+
       const orderPayload = {
         receiptId: cloudReceiptId,
         items: item.items,
         totalAmount: item.total_amount,
         shippingInfo: item.shipping_info,
         summary: item.summary,
-        status: item.status || 'synced',
-        rejectionReason: item.rejection_reason || undefined,
+        status: resolvedStatus,
+        rejectionReason: cleanRejectionReason,
         cancellationReason: item.cancellation_reason || undefined,
         createdAt: new Date(item.created_at).getTime()
       };
@@ -323,18 +349,27 @@ export const syncEventToCloud = async (ev: EventItem) => {
   const supabase = getSupabaseClient();
   if (!supabase) return;
 
-  const { error } = await supabase
-    .from('events')
-    .upsert({
-      id: ev.id,
-      title: ev.title,
-      type: ev.type,
-      event_date: ev.eventDate,
-      event_end_date: ev.eventEndDate || null,
-      description: ev.description,
-      link_url: ev.linkUrl || null,
-      created_at: new Date(ev.createdAt).toISOString()
-    });
+  const payload: any = {
+    id: ev.id,
+    title: ev.title,
+    type: ev.type,
+    event_date: ev.eventDate,
+    event_end_date: ev.eventEndDate || null,
+    description: ev.description,
+    link_url: ev.linkUrl || null,
+    is_completed: !!(ev.isCompleted || ev.isExpired),
+    is_expired: !!(ev.isCompleted || ev.isExpired),
+    created_at: new Date(ev.createdAt).toISOString()
+  };
+
+  let { error } = await supabase.from('events').upsert(payload);
+
+  // If cloud table doesn't have is_completed or is_expired columns, retry without them
+  if (error && (error.message.includes('is_completed') || error.message.includes('is_expired') || error.message.includes('column'))) {
+    const { is_completed, is_expired, ...fallbackPayload } = payload;
+    const retry = await supabase.from('events').upsert(fallbackPayload);
+    error = retry.error;
+  }
 
   if (error) {
     console.error("Failed to sync event to cloud: ", error.message);
